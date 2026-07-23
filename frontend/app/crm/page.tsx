@@ -1,10 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ApiError, getCrmActivity, getCrmStats, type CrmStats, type RecentActivityItem } from "@/lib/api";
+
+function Bar({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
+  const pct = Math.round((value / total) * 100);
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-14 text-sm font-medium">{label}</span>
+      <div className="flex-1 h-5 rounded-full bg-muted overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${color}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="w-10 text-right text-sm text-muted-foreground">{value}</span>
+    </div>
+  );
+}
 
 export default function CrmPage() {
   const [stats, setStats] = useState<CrmStats | null>(null);
@@ -12,7 +28,7 @@ export default function CrmPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(() => {
+  function load() {
     setLoading(true);
     Promise.all([getCrmStats(), getCrmActivity()])
       .then(([s, a]) => {
@@ -22,29 +38,20 @@ export default function CrmPage() {
       })
       .catch((e) => setError(e instanceof ApiError ? e.message : "Failed to load CRM data"))
       .finally(() => setLoading(false));
-  }, []);
+  }
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    getCrmStats()
+      .then((s) => { if (!cancelled) setStats(s); })
+      .catch((e) => { if (!cancelled) setError(e instanceof ApiError ? e.message : "Failed"); });
+    getCrmActivity()
+      .then((a) => { if (!cancelled) setActivity(a); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const scoreTotal = stats ? stats.hot + stats.warm + stats.cold || 1 : 1;
-
-  function Bar({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
-    const pct = Math.round((value / total) * 100);
-    return (
-      <div className="flex items-center gap-3">
-        <span className="w-14 text-sm font-medium">{label}</span>
-        <div className="flex-1 h-5 rounded-full bg-muted overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${color}`}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        <span className="w-10 text-right text-sm text-muted-foreground">{value}</span>
-      </div>
-    );
-  }
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
