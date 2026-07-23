@@ -1,0 +1,15 @@
+.env
+.env.local
+backend/.env
+frontend/.env.local
+venv/
+__pycache__/
+*.pyc
+node_modules/
+.next/
+chroma_data/
+chroma_data/*
+*.egg-info/
+dist/
+build/
+.vercel

@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: asdr
+      POSTGRES_PASSWORD: asdr
+      POSTGRES_DB: asdr
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asdr -d asdr"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY:?set GROQ_API_KEY in .env (see .env.example)}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      DATABASE_URL: postgresql+psycopg://asdr:asdr@db:5432/asdr
+      CLIENT_COMPANY_NAME: ${CLIENT_COMPANY_NAME:-Apex Digital}
+      CHROMA_PATH: /data/chroma
+      KB_SEED_FILE: ./mock_kb.txt
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      GMAIL_CLIENT_ID: ${GMAIL_CLIENT_ID:-}
+      GMAIL_CLIENT_SECRET: ${GMAIL_CLIENT_SECRET:-}
+      GMAIL_REFRESH_TOKEN: ${GMAIL_REFRESH_TOKEN:-}
+      GMAIL_USER_EMAIL: ${GMAIL_USER_EMAIL:-}
+      MAIL_MODE: ${MAIL_MODE:-hitl}
+      MAIL_POLL_INTERVAL: ${MAIL_POLL_INTERVAL:-30}
+      CHATBOT_URL: ${CHATBOT_URL:-http://localhost:3000/chat}
+    volumes:
+      - chroma_data:/data/chroma
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Build-time inlined into the JS bundle; changing it requires a rebuild.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  chroma_data:

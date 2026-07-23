@@ -1,0 +1,50 @@
+# Render blueprint: backend web service + managed Postgres.
+# Deploy: Render dashboard → New → Blueprint → point at this repo.
+services:
+  - type: web
+    name: asdr-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: DATABASE_URL
+        fromDatabase:
+          name: asdr-db
+          property: connectionString
+      - key: CLIENT_COMPANY_NAME
+        value: Apex Digital
+      - key: CHROMA_PATH
+        value: /data/chroma
+      - key: KB_SEED_FILE
+        value: ./mock_kb.txt
+      - key: CORS_ORIGINS
+        sync: false
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      - key: GMAIL_USER_EMAIL
+        sync: false
+      - key: MAIL_MODE
+        value: hitl
+      - key: MAIL_POLL_INTERVAL
+        value: "30"
+      - key: CHATBOT_URL
+        value: http://localhost:3000/chat
+    disk:
+      name: chroma-data
+      mountPath: /data/chroma
+      sizeGB: 1
+
+databases:
+  - name: asdr-db
+    plan: free
+    databaseName: asdr
+    user: asdr
