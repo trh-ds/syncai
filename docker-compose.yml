@@ -30,6 +30,15 @@ services:
       MAIL_MODE: ${MAIL_MODE:-hitl}
       MAIL_POLL_INTERVAL: ${MAIL_POLL_INTERVAL:-30}
       CHATBOT_URL: ${CHATBOT_URL:-http://localhost:3000/chat}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      APOLLO_API_KEY: ${APOLLO_API_KEY:-}
+      BUSINESS_NAME: ${BUSINESS_NAME:-Apex Digital LLC}
+      BUSINESS_ADDRESS: ${BUSINESS_ADDRESS:-600 Congress Ave, Austin, TX 78701}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+      WEB_URL: ${WEB_URL:-http://localhost:3000}
     volumes:
       - chroma_data:/data/chroma
     depends_on:
@@ -42,8 +51,9 @@ services:
     build:
       context: ./frontend
       args:
-        # Build-time inlined into the JS bundle; changing it requires a rebuild.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
     depends_on:
       - backend
     ports:
