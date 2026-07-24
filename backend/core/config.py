@@ -25,6 +25,30 @@ class Settings(BaseSettings):
     # Chatbot
     CHATBOT_URL: str = "http://localhost:3000/chat"
 
+    # Supabase (Auth + hosted Postgres). Leave blank to run single-tenant demo mode.
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_JWT_SECRET: str = ""
+
+    # Stripe (test mode). Leave blank to run without billing.
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRICE_STARTER: str = ""
+    STRIPE_PRICE_GROWTH: str = ""
+    STRIPE_PRICE_SCALE: str = ""
+
+    # Notifications / enrichment (optional, no-op when blank)
+    SLACK_WEBHOOK_URL: str = ""
+    APOLLO_API_KEY: str = ""
+
+    # CAN-SPAM compliance identity
+    BUSINESS_NAME: str = "Apex Digital LLC"
+    BUSINESS_ADDRESS: str = "600 Congress Ave, Austin, TX 78701"
+
+    # Public URLs used in emails (unsubscribe link) and OAuth redirects
+    PUBLIC_API_URL: str = "http://localhost:8000"
+    WEB_URL: str = "http://localhost:3000"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

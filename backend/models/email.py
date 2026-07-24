@@ -18,6 +18,7 @@ class Email(Base):
     __tablename__ = "emails"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    org_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     sender: Mapped[str] = mapped_column(Text, nullable=False)
     sender_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     subject: Mapped[str] = mapped_column(Text, nullable=False)
@@ -28,6 +29,8 @@ class Email(Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, default="pending", server_default="pending")
     gmail_message_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True, unique=True)
     gmail_thread_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Set when this email is a reply to one we sent: interested | not-now | referral | objection | unsubscribe
+    reply_intent: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(nullable=False, default=_utcnow, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         nullable=False, default=_utcnow, onupdate=_utcnow, server_default=func.now()
