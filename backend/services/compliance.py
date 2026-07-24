@@ -12,17 +12,12 @@ from models.org import SendLog
 logger = logging.getLogger("compliance")
 
 
-def unsubscribe_url(customer: Customer) -> str:
-    # GET link so it works as a one-click from any email client
-    return f"{settings.PUBLIC_API_URL}/api/v1/unsubscribe/{customer.unsubscribe_token}"
-
-
 def build_footer(customer: Customer) -> str:
     """The disclosure text appended to every AI-drafted outbound email."""
     return (
         f"\n\n—\n{settings.BUSINESS_NAME}\n{settings.BUSINESS_ADDRESS}\n"
         f"You're receiving this because you contacted us. "
-        f"Unsubscribe instantly: {unsubscribe_url(customer)}"
+        f"Unsubscribe instantly: {settings.PUBLIC_API_URL}/api/v1/unsubscribe/{customer.unsubscribe_token}"
     )
 
 

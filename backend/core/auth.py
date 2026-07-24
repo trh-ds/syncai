@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from core.config import settings
 from core.database import default_org_id, get_db
-from models.org import PLANS, Organization
+from models.org import Organization
 
 logger = logging.getLogger("auth")
 
@@ -70,17 +70,3 @@ def require_auth(org: Organization = Depends(get_org)) -> Organization:
     return org
 
 
-def require_plan(min_plan: str):
-    """Server-side plan gate. Usage: Depends(require_plan('growth'))."""
-    min_rank = PLANS.index(min_plan)
-
-    def _dep(org: Organization = Depends(get_org)) -> Organization:
-        rank = PLANS.index(org.plan) if org.plan in PLANS else 0
-        if rank < min_rank:
-            raise HTTPException(
-                status_code=402,
-                detail={"code": "PLAN_REQUIRED", "message": f"This feature requires the {min_plan} plan or higher"},
-            )
-        return org
-
-    return _dep
