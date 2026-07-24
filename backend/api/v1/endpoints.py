@@ -8,32 +8,34 @@ from groq import APIError as GroqAPIError
 from sqlalchemy.orm import Session
 
 from agents import draft_agent
+from core.auth import get_org
 from core.database import get_db
 from models.email import DemoRequest, DemoResponse, Email, EmailOut, EmailPatch, Status
+from models.org import Organization
 
 router = APIRouter(tags=["emails"])
 
 
 @router.get("/emails", response_model=list[EmailOut])
-def list_emails(status: Status | None = Query(default=None), db: Session = Depends(get_db)):
-    q = db.query(Email)
+def list_emails(status: Status | None = Query(default=None), org: Organization = Depends(get_org), db: Session = Depends(get_db)):
+    q = db.query(Email).filter(Email.org_id == org.id)
     if status:
         q = q.filter(Email.status == status)
     return q.order_by(Email.created_at.desc()).all()
 
 
 @router.get("/emails/{email_id}", response_model=EmailOut)
-def get_email(email_id: uuid.UUID, db: Session = Depends(get_db)):
+def get_email(email_id: uuid.UUID, org: Organization = Depends(get_org), db: Session = Depends(get_db)):
     record = db.get(Email, email_id)
-    if not record:
+    if not record or record.org_id != org.id:
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": "Email not found"})
     return record
 
 
 @router.patch("/emails/{email_id}", response_model=EmailOut)
-def patch_email(email_id: uuid.UUID, patch: EmailPatch, db: Session = Depends(get_db)):
+def patch_email(email_id: uuid.UUID, patch: EmailPatch, org: Organization = Depends(get_org), db: Session = Depends(get_db)):
     record = db.get(Email, email_id)
-    if not record:
+    if not record or record.org_id != org.id:
         raise HTTPException(status_code=404, detail={"code": "NOT_FOUND", "message": "Email not found"})
     if patch.ai_draft is not None:
         record.ai_draft = patch.ai_draft

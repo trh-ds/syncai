@@ -9,10 +9,11 @@ from pydantic import BaseModel, Field
 
 from agents import rag_agent
 from core.config import settings
-from core.database import SessionLocal
+from core.database import SessionLocal, default_org_id
 from models.customer import Customer, Meeting
+from services import compliance, slack_notify
 from services.calendar_service import book_event, get_availability
-from services.customer_service import get_or_create_customer, log_interaction
+from services.customer_service import get_or_create_customer, log_interaction, set_lead_score
 
 router = APIRouter(tags=["chat"])
 logger = logging.getLogger("chat")
@@ -58,9 +59,10 @@ class ChatResponse(BaseModel):
 def chat_message(payload: ChatRequest):
     db = SessionLocal()
     try:
+        org_id = default_org_id(db)  # ponytail: public chatbot belongs to the default org
         customer = None
         if payload.email:
-            customer = get_or_create_customer(db, payload.email, payload.name, source="chat")
+            customer = get_or_create_customer(db, payload.email, payload.name, source="chat", org_id=org_id)
 
         rag_context = rag_agent.retrieve(payload.message) or "(no knowledge base)"
         customer_context = ""
@@ -110,18 +112,21 @@ def chat_message(payload: ChatRequest):
             )
 
         if customer:
-            log_interaction(customer.id, "chat", payload.message, "inbound", db)
-            log_interaction(customer.id, "chat", reply, "outbound", db)
+            log_interaction(customer.id, "chat", payload.message, "inbound", db, org_id=org_id)
+            log_interaction(customer.id, "chat", reply, "outbound", db, org_id=org_id)
+            became_hot = lead_score == "hot" and customer.lead_score != "hot"
             if lead_score in ("hot", "warm", "cold"):
-                customer.lead_score = lead_score
+                set_lead_score(customer, lead_score)
             customer.name = payload.name or customer.name
+            if became_hot:
+                slack_notify.notify_hot_lead(customer.email, customer.name, "chat")
             db.commit()
 
         customer_email = payload.email or (customer.email if customer else None)
 
         if _is_booking_request(payload.message) and customer and customer_email:
             try:
-                booking_result = _attempt_booking(db, customer, payload.name or customer.name or "Client")
+                booking_result = _attempt_booking(db, customer, payload.name or customer.name or "Client", org_id=org_id)
             except Exception as e:
                 logger.error("Booking attempt failed: %s", e)
 
@@ -141,7 +146,7 @@ def _is_booking_request(message: str) -> bool:
     return any(k in lower for k in keywords)
 
 
-def _attempt_booking(db, customer: Customer, attendee_name: str) -> dict | None:
+def _attempt_booking(db, customer: Customer, attendee_name: str, org_id=None) -> dict | None:
     slots = get_availability(days=7)
     if not slots:
         return {"error": "No available slots in the next 7 days."}
@@ -167,6 +172,7 @@ def _attempt_booking(db, customer: Customer, attendee_name: str) -> dict | None:
         return {"error": "Failed to create calendar event."}
 
     meeting = Meeting(
+        org_id=org_id,
         customer_id=customer.id,
         google_event_id=event["id"],
         summary=event["summary"],
@@ -175,12 +181,14 @@ def _attempt_booking(db, customer: Customer, attendee_name: str) -> dict | None:
         status="scheduled",
     )
     db.add(meeting)
-    customer.lead_score = "hot"
+    set_lead_score(customer, "hot")
     db.commit()
+    slack_notify.notify_meeting(event["summary"], start.isoformat())
 
     from services.gmail_client import GmailClient
     try:
         gmail = GmailClient()
+        # Transactional booking confirmation (CAN-SPAM exempt), still audit-logged
         confirm_body = (
             f"Hi {attendee_name},\n\n"
             f"Your meeting is confirmed!\n\n"
@@ -189,13 +197,15 @@ def _attempt_booking(db, customer: Customer, attendee_name: str) -> dict | None:
             f"We look forward to speaking with you.\n\n"
             f"Best,\n{settings.CLIENT_COMPANY_NAME}"
         )
-        gmail.send_reply(
+        sent = gmail.send_reply(
             thread_id="",
             to=customer.email,
             subject="Meeting Confirmed",
             body=confirm_body,
             message_id="",
         )
+        if sent:
+            compliance.log_send(db, customer.email, "Transactional meeting confirmation", org_id=org_id)
     except Exception as e:
         logger.warning("Confirmation email failed: %s", e)
 

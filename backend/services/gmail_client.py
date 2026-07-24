@@ -18,10 +18,10 @@ SCOPES = [
 ]
 
 
-def _creds() -> Credentials:
+def _creds(refresh_token: str | None = None) -> Credentials:
     c = Credentials(
         token=None,
-        refresh_token=settings.GMAIL_REFRESH_TOKEN,
+        refresh_token=refresh_token or settings.GMAIL_REFRESH_TOKEN,
         token_uri="https://oauth2.googleapis.com/token",
         client_id=settings.GMAIL_CLIENT_ID,
         client_secret=settings.GMAIL_CLIENT_SECRET,
@@ -33,8 +33,11 @@ def _creds() -> Credentials:
 
 # ponytail: simple wrapper, add connection pooling if throughput matters
 class GmailClient:
-    def __init__(self):
-        self.service = build("gmail", "v1", credentials=_creds())
+    def __init__(self, org=None):
+        # Per-org token from onboarding OAuth; falls back to env-based single-tenant creds
+        token = getattr(org, "gmail_refresh_token", None) if org is not None else None
+        self.org = org
+        self.service = build("gmail", "v1", credentials=_creds(token))
 
     def fetch_unread(self) -> list[dict]:
         """Return list of unread messages with full payload, newest first."""
@@ -108,4 +111,5 @@ class GmailClient:
 
     def refresh(self):
         """Rebuild the service with fresh credentials (call on HttpError 401)."""
-        self.service = build("gmail", "v1", credentials=_creds())
+        token = getattr(self.org, "gmail_refresh_token", None) if self.org is not None else None
+        self.service = build("gmail", "v1", credentials=_creds(token))
