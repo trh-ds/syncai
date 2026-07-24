@@ -66,3 +66,43 @@ def triage(sender: str, subject: str, body: str) -> TriageResult:
         return TriageResult.model_validate_json(completion.choices[0].message.content)
     except ValidationError as e:
         raise RuntimeError(f"Triage agent returned invalid JSON: {e}") from e
+
+
+REPLY_SYSTEM_PROMPT = """You are an expert sales operations assistant for {company}.
+We previously sent an email to this lead, and this is their REPLY.
+
+Classify the reply into exactly one of:
+- interested: they want to move forward (questions, pricing, next steps, booking)
+- not-now: interested later / bad timing — nurture, don't push
+- referral: they point us to someone else
+- objection: a concern to handle (price, timing, trust, competitor)
+- unsubscribe: they ask to stop receiving emails (any phrasing)
+
+Also write a 1-sentence summary.
+
+Output strictly in JSON format:
+{{"reply_intent": "interested | not-now | referral | objection | unsubscribe", "summary": "1 sentence"}}"""
+
+
+class ReplyResult(BaseModel):
+    reply_intent: str  # interested | not-now | referral | objection | unsubscribe
+    summary: str
+
+
+def classify_reply(sender: str, subject: str, body: str) -> ReplyResult:
+    completion = _client().chat.completions.create(
+        model=settings.GROQ_MODEL,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": REPLY_SYSTEM_PROMPT.format(company=settings.CLIENT_COMPANY_NAME)},
+            {"role": "user", "content": f"From: {sender}\nSubject: {subject}\n\n{body}"},
+        ],
+    )
+    try:
+        result = ReplyResult.model_validate_json(completion.choices[0].message.content)
+    except ValidationError as e:
+        raise RuntimeError(f"Reply classifier returned invalid JSON: {e}") from e
+    valid = {"interested", "not-now", "referral", "objection", "unsubscribe"}
+    if result.reply_intent not in valid:
+        result.reply_intent = "objection"  # ponytail: safest bucket for unparseable intent
+    return result
