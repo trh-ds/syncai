@@ -115,17 +115,56 @@ Inbound Email (Gmail)
 | `POST` | `/api/v1/chat/message` | Chat message → reply + lead score + booking |
 | `GET` | `/api/v1/calendar/availability` | Available 30-min booking slots |
 | `POST` | `/api/v1/calendar/book` | Book a meeting |
-| `GET` | `/api/v1/crm/stats` | CRM aggregate statistics |
+| `GET` | `/api/v1/crm/stats` | CRM aggregate statistics (incl. pipeline forecast) |
 | `GET` | `/api/v1/crm/activity` | Recent CRM activity feed |
+| `GET` | `/api/v1/billing/plan` | Current org plan |
+| `POST` | `/api/v1/billing/checkout` | Create Stripe Checkout session (auth) |
+| `POST` | `/api/v1/billing/webhook` | Stripe webhook → set plan |
+| `GET` | `/api/v1/onboarding/status` | Org Gmail/plan status (auth) |
+| `GET` | `/api/v1/onboarding/google` | Start Gmail+Calendar OAuth (auth) |
+| `GET` | `/api/v1/onboarding/google/callback` | OAuth callback → store refresh token |
+| `POST` | `/api/v1/unsubscribe/{token}` | CAN-SPAM opt-out (also GET for one-click email links) |
+
+### 7. SaaS Shell (auth, billing, multi-tenant-lite)
+- **Auth**: Supabase Auth — email/password + Google OAuth on `/signup`, `/login`
+- **Multi-tenant-lite**: `org_id` on emails/customers/interactions/meetings; every query filters by it. Unauthenticated traffic falls back to a default org (keeps the demo working with zero config)
+- **Billing**: Stripe Checkout (test mode), 3 plans (starter/growth/scale) on `organizations.plan`. Server-side gates: Slack alerts → growth+, Apollo enrichment → scale
+- **Onboarding** (`/onboarding`): pick plan → connect Gmail+Calendar via OAuth UI (replaces the manual `scripts/gmail_auth.py` run)
+
+### 8. Compliance (CAN-SPAM)
+- Every AI-drafted email gets an auto-appended footer: business name, physical address, one-click unsubscribe link
+- `customers.opted_out` is a hard gate — poller and all send paths skip opted-out contacts, no exceptions
+- `consent_source` / `consent_timestamp` tracked on every customer
+- `send_logs` table records the exact disclosure text + timestamp of every send (audit trail)
+
+### 9. Agent Upgrades
+- **Reply triage**: replies to engaged threads are classified separately (interested / not-now / referral / objection / unsubscribe) and routed — unsubscribe auto-opts-out, interested marks hot + drafts follow-up
+- **Enrichment agent**: Apollo.io per-lead lookup (job title, company size) on new customers — Scale plan only
+- **Slack**: incoming webhook fires on new hot leads and booked meetings — Growth plan and up
+- **Pipeline forecast**: `deal_value_estimate` per customer (stage heuristic), stage-weighted forecast on `/crm`
 
 ---
 
 ## Database Schema
 
+### Table: `organizations`
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID PK | |
+| name | TEXT | |
+| owner_user_id | UUID NULL UNIQUE | Supabase auth user (NULL = default demo org) |
+| owner_email | TEXT NULL | |
+| plan | TEXT | starter / growth / scale |
+| stripe_customer_id | TEXT NULL | |
+| gmail_refresh_token | TEXT NULL | Set via onboarding OAuth |
+| gmail_user_email | TEXT NULL | |
+| created_at | TIMESTAMPTZ | |
+
 ### Table: `emails`
 | Column | Type | Notes |
 |---|---|---|
 | id | UUID PK | |
+| org_id | UUID NULL | Tenant scope |
 | sender | TEXT | From-address |
 | sender_name | TEXT NULL | Extracted by triage |
 | subject | TEXT | |
@@ -136,6 +175,7 @@ Inbound Email (Gmail)
 | status | TEXT | pending / approved / discarded / sent |
 | gmail_message_id | TEXT UNIQUE | Dedup key |
 | gmail_thread_id | TEXT NULL | Gmail thread tracking |
+| reply_intent | TEXT NULL | interested / not-now / referral / objection / unsubscribe |
 | created_at | TIMESTAMPTZ | Indexed DESC |
 | updated_at | TIMESTAMPTZ | Auto-updated |
 
@@ -143,10 +183,18 @@ Inbound Email (Gmail)
 | Column | Type | Notes |
 |---|---|---|
 | id | UUID PK | |
+| org_id | UUID FK NULL | Tenant scope |
 | email | TEXT UNIQUE | |
 | name | TEXT NULL | |
 | lead_score | TEXT | hot / warm / cold |
 | source | TEXT | email / chat |
+| consent_source | TEXT NULL | inbound_email / chat |
+| consent_timestamp | TIMESTAMPTZ NULL | CAN-SPAM consent record |
+| opted_out | BOOLEAN | Hard send gate when true |
+| unsubscribe_token | TEXT UNIQUE | One-click unsubscribe |
+| deal_value_estimate | DOUBLE NULL | Stage heuristic (hot 5000 / warm 2000 / cold 500) |
+| job_title | TEXT NULL | Apollo enrichment |
+| company_size | TEXT NULL | Apollo enrichment |
 | created_at | TIMESTAMPTZ | |
 | updated_at | TIMESTAMPTZ | |
 
@@ -154,6 +202,7 @@ Inbound Email (Gmail)
 | Column | Type | Notes |
 |---|---|---|
 | id | UUID PK | |
+| org_id | UUID FK NULL | Tenant scope |
 | customer_id | UUID FK | |
 | channel | TEXT | email / chat |
 | content | TEXT | Message body |
@@ -164,6 +213,7 @@ Inbound Email (Gmail)
 | Column | Type | Notes |
 |---|---|---|
 | id | UUID PK | |
+| org_id | UUID FK NULL | Tenant scope |
 | customer_id | UUID FK NULL | |
 | google_event_id | TEXT NULL | |
 | summary | TEXT | |
@@ -171,6 +221,15 @@ Inbound Email (Gmail)
 | end_time | TIMESTAMPTZ | |
 | status | TEXT | scheduled / cancelled |
 | created_at | TIMESTAMPTZ | |
+
+### Table: `send_logs`
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID PK | |
+| org_id | UUID NULL | Tenant scope |
+| recipient | TEXT | |
+| disclosure_text | TEXT | Exact CAN-SPAM footer sent |
+| sent_at | TIMESTAMPTZ | Audit trail |
 
 ### Vector Store: ChromaDB
 - Collection: `knowledge_base`
@@ -261,11 +320,19 @@ syncai/
 | `MAIL_MODE` | `hitl` | No |
 | `MAIL_POLL_INTERVAL` | `30` | No |
 | `CHATBOT_URL` | `http://localhost:3000/chat` | No |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_JWT_SECRET` | — | For auth (multi-tenant) |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_*` | — | For billing (test mode) |
+| `SLACK_WEBHOOK_URL` | — | For Slack alerts |
+| `APOLLO_API_KEY` | — | For lead enrichment |
+| `BUSINESS_NAME` / `BUSINESS_ADDRESS` | Apex Digital LLC / Austin TX | CAN-SPAM footer |
+| `PUBLIC_API_URL` / `WEB_URL` | localhost | Unsubscribe links / redirects |
 
 ### Frontend (`frontend/.env.local`)
 | Variable | Example | Required |
 |---|---|---|
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Yes |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://xxx.supabase.co` | For auth |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `eyJ...` | For auth |
 
 ---
 
@@ -281,7 +348,13 @@ docker compose up --build
 - Frontend: http://localhost:3000
 - Backend: http://localhost:8000
 
-### Gmail Setup (one-time)
+### Gmail Setup
+
+**Self-serve (product path):** sign up at `/signup` → `/onboarding` → "Connect Google account".
+Requires a **Web application** OAuth client with redirect URI
+`{PUBLIC_API_URL}/api/v1/onboarding/google/callback` registered in Google Cloud Console.
+
+**Manual (single-tenant demo path):**
 1. Google Cloud Console → create project → enable Gmail API + Calendar API
 2. Credentials → OAuth 2.0 Client ID (Desktop app)
 3. Set `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET` in `backend/.env`
@@ -301,8 +374,10 @@ cp frontend/.env.example frontend/.env.local  # Frontend env
 ## Deployment
 
 ### Backend (Render)
-- Use `render.yaml` Blueprint → creates `asdr-backend` (Docker) + `asdr-db` (Postgres free plan)
-- Manually set: `GROQ_API_KEY`, `CORS_ORIGINS`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_USER_EMAIL`
+- Use `render.yaml` Blueprint → creates `asdr-backend` (Docker web service only)
+- **Database + Auth are on Supabase** (Render's free Postgres auto-expires ~30–90 days) — see DEPLOY.md
+- Manually set: `GROQ_API_KEY`, `DATABASE_URL` (Supabase), `SUPABASE_*`, `CORS_ORIGINS`, Gmail/Stripe/Slack/Apollo keys
+- Keep-alive: `.github/workflows/keepalive.yml` pings `/health` every 3 days (prevents Supabase auto-pause + Render sleep)
 
 ### Frontend (Vercel)
 - Import repo → set Root Directory to `frontend`
@@ -323,10 +398,13 @@ Every feature was designed to operate within **$0/month** operating costs:
 | Cost Centre | Solution | Monthly Cost |
 |---|---|---|
 | **LLM** | Groq free tier (100K tokens/day) — enough for ~50 leads/day at current usage | $0 |
-| **Database** | Render free Postgres (1GB) | $0 |
+| **Database + Auth** | Supabase free tier (500 MB DB, 50k MAU, 2 projects) — keep-alive cron prevents 7-day auto-pause | $0 |
 | **Vector DB** | ChromaDB in-process (no external service) | $0 |
 | **Hosting (frontend)** | Vercel free tier | $0 |
-| **Hosting (backend)** | Render free tier (web service + Postgres) | $0 |
+| **Hosting (backend)** | Render free web service (sleeps after 15 min idle, ~60s cold start) | $0 |
+| **Payments** | Stripe test mode (live mode: per-transaction cut only, no monthly fee) | $0 |
+| **Notifications** | Slack incoming webhook | $0 |
+| **Enrichment** | Apollo.io free credits — light per-lead lookups only | $0 |
 | **Email API** | Gmail free tier (Google OAuth, no paid API) | $0 |
 | **Calendar API** | Google Calendar free tier | $0 |
 | **CI/CD** | GitHub Actions free tier (2000 min/month) | $0 |
