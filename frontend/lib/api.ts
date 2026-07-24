@@ -203,26 +203,9 @@ async function authedRequest<T>(path: string, token: string, init?: RequestInit)
   return res.json() as Promise<T>;
 }
 
-export interface BillingPlan {
-  plan: string;
-  stripe_configured: boolean;
-}
-
-export function getBillingPlan(token: string): Promise<BillingPlan> {
-  return authedRequest<BillingPlan>("/api/v1/billing/plan", token);
-}
-
-export function createCheckout(token: string, plan: string): Promise<{ checkout_url: string }> {
-  return authedRequest<{ checkout_url: string }>("/api/v1/billing/checkout", token, {
-    method: "POST",
-    body: JSON.stringify({ plan }),
-  });
-}
-
 export interface OnboardingStatus {
   gmail_connected: boolean;
   gmail_user: string | null;
-  plan: string;
 }
 
 export function getOnboardingStatus(token: string): Promise<OnboardingStatus> {

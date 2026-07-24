@@ -104,8 +104,7 @@ def _handle_reply(db: Session, gmail: GmailClient, org, msg_id: str, thread_id: 
     elif result.reply_intent == "interested":
         if customer:
             set_lead_score(customer, "hot")
-            if org.plan in ("growth", "scale"):
-                slack_notify.notify_hot_lead(sender, customer.name, "email reply")
+            slack_notify.notify_hot_lead(sender, customer.name, "email reply")
         # Draft a follow-up (with compliance footer) for HITL/auto handling
         context = rag_agent.retrieve(f"{subject}\n{body}")
         footer = compliance.build_footer(customer) if customer else ""
@@ -240,12 +239,11 @@ def _process_email(gmail: GmailClient, msg: dict, org: Organization):
         if ai_draft:
             log_interaction(customer.id, "email", ai_draft, "outbound", db, org_id=org.id)
 
-        # New hot lead → Slack (Growth plan and up) + enrichment (Scale plan)
+        # New hot lead → Slack + enrichment
         if triage.lead_quality == "high":
             set_lead_score(customer, "hot")
-            if org.plan in ("growth", "scale"):
-                slack_notify.notify_hot_lead(sender, triage.sender_name, "email")
-        if org.plan == "scale" and not customer.job_title:
+            slack_notify.notify_hot_lead(sender, triage.sender_name, "email")
+        if not customer.job_title:
             enrichment_agent.enrich_customer(customer)
 
         if settings.MAIL_MODE == "auto" and ai_draft and compliance.can_send(customer):

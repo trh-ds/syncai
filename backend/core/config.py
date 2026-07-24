@@ -30,13 +30,6 @@ class Settings(BaseSettings):
     SUPABASE_ANON_KEY: str = ""
     SUPABASE_JWT_SECRET: str = ""
 
-    # Stripe (test mode). Leave blank to run without billing.
-    STRIPE_SECRET_KEY: str = ""
-    STRIPE_WEBHOOK_SECRET: str = ""
-    STRIPE_PRICE_STARTER: str = ""
-    STRIPE_PRICE_GROWTH: str = ""
-    STRIPE_PRICE_SCALE: str = ""
-
     # Notifications / enrichment (optional, no-op when blank)
     SLACK_WEBHOOK_URL: str = ""
     APOLLO_API_KEY: str = ""

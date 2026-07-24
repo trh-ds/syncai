@@ -213,10 +213,10 @@ export default function Home() {
                   ))}
                 </ul>
                 <Link
-                  href={`/signup?plan=${t.name.toLowerCase()}`}
+                  href="/signup"
                   className={`${buttonVariants({ className: "mt-6 w-full", variant: t.featured ? "default" : "outline" })}`}
                 >
-                  Choose {t.name}
+                  Start with {t.name}
                 </Link>
               </div>
             ))}

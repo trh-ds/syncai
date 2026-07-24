@@ -7,8 +7,6 @@ from sqlalchemy.types import Uuid
 
 from core.database import Base
 
-PLANS = ("starter", "growth", "scale")
-
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -23,8 +21,6 @@ class Organization(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False)
     owner_user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True, unique=True)  # Supabase auth user
     owner_email: Mapped[str | None] = mapped_column(Text, nullable=True)
-    plan: Mapped[str] = mapped_column(Text, nullable=False, default="starter", server_default="starter")
-    stripe_customer_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Gmail/Calendar connection (set during onboarding OAuth)
     gmail_refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     gmail_user_email: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -30,7 +30,7 @@ Frontend → Vercel. Backend → Render. Database + Auth → Supabase.
    - `CORS_ORIGINS` — your Vercel URL
    - `PUBLIC_API_URL` — your Render URL (used in unsubscribe links)
    - `WEB_URL` — your Vercel URL (OAuth/billing redirects)
-   - Optional: `STRIPE_*` (test mode keys + 3 price IDs), `SLACK_WEBHOOK_URL`, `APOLLO_API_KEY`
+    - Optional: `SLACK_WEBHOOK_URL`, `APOLLO_API_KEY`
 3. Note: free web services sleep after 15 min idle (~30–60s cold start). The
    keep-alive workflow doubles as a warmer.
 
@@ -41,13 +41,6 @@ Frontend → Vercel. Backend → Render. Database + Auth → Supabase.
    - `NEXT_PUBLIC_API_URL` = your Render backend URL
    - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` = from step 0
 3. Deploy.
-
-## 3. Stripe (test mode)
-
-1. stripe.com → **Developers → API keys** → test secret key → `STRIPE_SECRET_KEY`.
-2. **Products** → create Starter/Growth/Scale recurring prices → `STRIPE_PRICE_*`.
-3. **Developers → Webhooks** → endpoint `https://your-backend.onrender.com/api/v1/billing/webhook`,
-   event `checkout.session.completed` → signing secret → `STRIPE_WEBHOOK_SECRET`.
 
 ## Caveat: NEXT_PUBLIC_* is build-time inlined
 
@@ -61,7 +54,6 @@ Changing them later requires a **rebuild/redeploy** of the frontend.
 | `GROQ_API_KEY`, `GROQ_MODEL`, `CLIENT_COMPANY_NAME` | Render dashboard |
 | `DATABASE_URL` | Supabase connection string (set in Render) |
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` | Render dashboard |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*` | Render dashboard |
 | `SLACK_WEBHOOK_URL`, `APOLLO_API_KEY` | Render dashboard (optional) |
 | `BUSINESS_NAME`, `BUSINESS_ADDRESS` | render.yaml defaults (CAN-SPAM footer) |
 | `PUBLIC_API_URL`, `WEB_URL`, `CORS_ORIGINS` | Render dashboard |

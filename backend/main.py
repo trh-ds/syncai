@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from agents import rag_agent
-from api.v1 import billing, calendar_routes, chat, compliance_routes, crm, endpoints, onboarding, settings, webhooks
+from api.v1 import calendar_routes, chat, compliance_routes, crm, endpoints, onboarding, settings, webhooks
 from core.config import settings as app_settings
 from core.database import init_db
 from services.mail_poller import poller
@@ -67,6 +67,5 @@ app.include_router(settings.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(calendar_routes.router, prefix="/api/v1")
 app.include_router(crm.router, prefix="/api/v1")
-app.include_router(billing.router, prefix="/api/v1")
 app.include_router(onboarding.router, prefix="/api/v1")
 app.include_router(compliance_routes.router, prefix="/api/v1")

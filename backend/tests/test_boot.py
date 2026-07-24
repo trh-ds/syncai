@@ -29,8 +29,6 @@ def test_boot():
         assert "pipeline_forecast" in stats
         # Unsubscribe with bad token → 404, not a crash
         assert client.post("/api/v1/unsubscribe/bogus").status_code == 404
-        # Plan endpoint works unauthenticated (default org, starter)
-        assert client.get("/api/v1/billing/plan").json()["plan"] == "starter"
     print("Boot smoke test passed")
 
 

@@ -117,19 +117,15 @@ Inbound Email (Gmail)
 | `POST` | `/api/v1/calendar/book` | Book a meeting |
 | `GET` | `/api/v1/crm/stats` | CRM aggregate statistics (incl. pipeline forecast) |
 | `GET` | `/api/v1/crm/activity` | Recent CRM activity feed |
-| `GET` | `/api/v1/billing/plan` | Current org plan |
-| `POST` | `/api/v1/billing/checkout` | Create Stripe Checkout session (auth) |
-| `POST` | `/api/v1/billing/webhook` | Stripe webhook → set plan |
-| `GET` | `/api/v1/onboarding/status` | Org Gmail/plan status (auth) |
+| `GET` | `/api/v1/onboarding/status` | Org Gmail status (auth) |
 | `GET` | `/api/v1/onboarding/google` | Start Gmail+Calendar OAuth (auth) |
 | `GET` | `/api/v1/onboarding/google/callback` | OAuth callback → store refresh token |
 | `POST` | `/api/v1/unsubscribe/{token}` | CAN-SPAM opt-out (also GET for one-click email links) |
 
-### 7. SaaS Shell (auth, billing, multi-tenant-lite)
+### 7. SaaS Shell (auth, multi-tenant-lite)
 - **Auth**: Supabase Auth — email/password + Google OAuth on `/signup`, `/login`
 - **Multi-tenant-lite**: `org_id` on emails/customers/interactions/meetings; every query filters by it. Unauthenticated traffic falls back to a default org (keeps the demo working with zero config)
-- **Billing**: Stripe Checkout (test mode), 3 plans (starter/growth/scale) on `organizations.plan`. Server-side gates: Slack alerts → growth+, Apollo enrichment → scale
-- **Onboarding** (`/onboarding`): pick plan → connect Gmail+Calendar via OAuth UI (replaces the manual `scripts/gmail_auth.py` run)
+- **Onboarding** (`/onboarding`): sign up, connect Gmail+Calendar via OAuth UI (replaces the manual `scripts/gmail_auth.py` run)
 
 ### 8. Compliance (CAN-SPAM)
 - Every AI-drafted email gets an auto-appended footer: business name, physical address, one-click unsubscribe link
@@ -154,8 +150,6 @@ Inbound Email (Gmail)
 | name | TEXT | |
 | owner_user_id | UUID NULL UNIQUE | Supabase auth user (NULL = default demo org) |
 | owner_email | TEXT NULL | |
-| plan | TEXT | starter / growth / scale |
-| stripe_customer_id | TEXT NULL | |
 | gmail_refresh_token | TEXT NULL | Set via onboarding OAuth |
 | gmail_user_email | TEXT NULL | |
 | created_at | TIMESTAMPTZ | |
@@ -321,7 +315,6 @@ syncai/
 | `MAIL_POLL_INTERVAL` | `30` | No |
 | `CHATBOT_URL` | `http://localhost:3000/chat` | No |
 | `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_JWT_SECRET` | — | For auth (multi-tenant) |
-| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_*` | — | For billing (test mode) |
 | `SLACK_WEBHOOK_URL` | — | For Slack alerts |
 | `APOLLO_API_KEY` | — | For lead enrichment |
 | `BUSINESS_NAME` / `BUSINESS_ADDRESS` | Apex Digital LLC / Austin TX | CAN-SPAM footer |
@@ -376,7 +369,7 @@ cp frontend/.env.example frontend/.env.local  # Frontend env
 ### Backend (Render)
 - Use `render.yaml` Blueprint → creates `asdr-backend` (Docker web service only)
 - **Database + Auth are on Supabase** (Render's free Postgres auto-expires ~30–90 days) — see DEPLOY.md
-- Manually set: `GROQ_API_KEY`, `DATABASE_URL` (Supabase), `SUPABASE_*`, `CORS_ORIGINS`, Gmail/Stripe/Slack/Apollo keys
+- Manually set: `GROQ_API_KEY`, `DATABASE_URL` (Supabase), `SUPABASE_*`, `CORS_ORIGINS`, Gmail/Slack/Apollo keys
 - Keep-alive: `.github/workflows/keepalive.yml` pings `/health` every 3 days (prevents Supabase auto-pause + Render sleep)
 
 ### Frontend (Vercel)
@@ -402,7 +395,6 @@ Every feature was designed to operate within **$0/month** operating costs:
 | **Vector DB** | ChromaDB in-process (no external service) | $0 |
 | **Hosting (frontend)** | Vercel free tier | $0 |
 | **Hosting (backend)** | Render free web service (sleeps after 15 min idle, ~60s cold start) | $0 |
-| **Payments** | Stripe test mode (live mode: per-transaction cut only, no monthly fee) | $0 |
 | **Notifications** | Slack incoming webhook | $0 |
 | **Enrichment** | Apollo.io free credits — light per-lead lookups only | $0 |
 | **Email API** | Gmail free tier (Google OAuth, no paid API) | $0 |

@@ -32,7 +32,6 @@ class ConnectUrlOut(BaseModel):
 class StatusOut(BaseModel):
     gmail_connected: bool
     gmail_user: str | None
-    plan: str
 
 
 @router.get("/status", response_model=StatusOut)
@@ -40,7 +39,6 @@ def status(org: Organization = Depends(require_auth)):
     return StatusOut(
         gmail_connected=bool(org.gmail_refresh_token),
         gmail_user=org.gmail_user_email,
-        plan=org.plan,
     )
 
 

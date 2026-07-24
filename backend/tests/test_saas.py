@@ -1,10 +1,8 @@
-"""Self-checks for the compliance + billing paths. Run: python tests/test_saas.py (or pytest).
+"""Self-checks for compliance + deal-value paths. Run: python tests/test_saas.py (or pytest).
 
 Uses in-memory SQLite — no external services, no LLM calls.
 """
 
-import hashlib
-import hmac
 import os
 import sys
 
@@ -15,7 +13,6 @@ from core.database import Base, engine, SessionLocal  # noqa: E402
 from models.customer import Customer  # noqa: E402
 from services import compliance  # noqa: E402
 from services.customer_service import DEAL_VALUE_BY_SCORE, FORECAST_WEIGHT, estimate_deal_value, set_lead_score  # noqa: E402
-from api.v1.billing import _verify_stripe_signature  # noqa: E402
 from core.config import settings  # noqa: E402
 
 
@@ -46,21 +43,6 @@ def test_footer_and_opt_out():
         db.close()
 
 
-def test_stripe_signature():
-    settings.STRIPE_WEBHOOK_SECRET = "whsec_test"
-    body = b'{"type":"checkout.session.completed"}'
-    ts = "1700000000"
-    sig = hmac.new(b"whsec_test", f"{ts}.{body.decode()}".encode(), hashlib.sha256).hexdigest()
-    assert _verify_stripe_signature(body, f"t={ts},v1={sig}") is False  # too old (>5 min)
-    import time
-
-    ts = str(int(time.time()))
-    sig = hmac.new(b"whsec_test", f"{ts}.{body.decode()}".encode(), hashlib.sha256).hexdigest()
-    assert _verify_stripe_signature(body, f"t={ts},v1={sig}") is True
-    assert _verify_stripe_signature(body, f"t={ts},v1=deadbeef") is False
-    assert _verify_stripe_signature(b'{"tampered":1}', f"t={ts},v1={sig}") is False
-
-
 def test_deal_value_and_forecast():
     assert estimate_deal_value("hot") == DEAL_VALUE_BY_SCORE["hot"]
     assert estimate_deal_value("nonsense") == 500.0
@@ -75,6 +57,5 @@ def test_deal_value_and_forecast():
 
 if __name__ == "__main__":
     test_footer_and_opt_out()
-    test_stripe_signature()
     test_deal_value_and_forecast()
     print("All self-checks passed")
