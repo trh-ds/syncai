@@ -13,7 +13,7 @@ Write a concise, friendly, and highly personalized reply to the lead. Address th
 IMPORTANT: End your reply by inviting the lead to continue the conversation on our live chat assistant for instant answers and faster booking. Say something like: "For immediate assistance or to book a meeting right now, chat with our AI assistant at {chatbot_url} — it can answer your questions and find the perfect time for a call." """
 
 
-def draft_reply(original_email: str, sender_name: str | None, summary: str, rag_context: str) -> str:
+def draft_reply(original_email: str, sender_name: str | None, summary: str, rag_context: str, footer: str = "") -> str:
     prompt = DRAFT_SYSTEM_PROMPT.format(
         company=settings.CLIENT_COMPANY_NAME,
         original_email=original_email,
@@ -30,4 +30,8 @@ def draft_reply(original_email: str, sender_name: str | None, summary: str, rag_
             {"role": "user", "content": "Write the reply now."},
         ],
     )
-    return completion.choices[0].message.content.strip()
+    body = completion.choices[0].message.content.strip()
+    # CAN-SPAM: no draft leaves without the disclosure footer
+    if footer and footer.strip() not in body:
+        body += footer
+    return body
