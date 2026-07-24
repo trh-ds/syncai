@@ -21,6 +21,11 @@ export function Navbar() {
             Demo
           </Link>
         </div>
+        <div className="ml-auto">
+          <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            Sign in
+          </Link>
+        </div>
       </nav>
     </header>
   );

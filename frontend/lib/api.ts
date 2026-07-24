@@ -156,6 +156,8 @@ export interface CrmStats {
   warm: number;
   cold: number;
   total_meetings: number;
+  pipeline_value: number;
+  pipeline_forecast: number;
   by_source: Record<string, number>;
   by_service: Record<string, number>;
 }
@@ -172,4 +174,67 @@ export function getCrmStats(): Promise<CrmStats> {
 
 export function getCrmActivity(): Promise<RecentActivityItem[]> {
   return request<RecentActivityItem[]>("/api/v1/crm/activity");
+}
+
+// ─── Authenticated (Supabase JWT) ───
+
+async function authedRequest<T>(path: string, token: string, init?: RequestInit): Promise<T> {
+  if (!BASE_URL) {
+    throw new ApiError("CONFIG", "NEXT_PUBLIC_API_URL is not set.", 0);
+  }
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      ...init?.headers,
+    },
+  });
+  if (!res.ok) {
+    let message = res.statusText;
+    try {
+      const body = await res.json();
+      if (body?.error?.message) message = body.error.message;
+    } catch {
+      // ponytail: non-JSON error body
+    }
+    throw new ApiError("HTTP_" + res.status, message, res.status);
+  }
+  return res.json() as Promise<T>;
+}
+
+export interface BillingPlan {
+  plan: string;
+  stripe_configured: boolean;
+}
+
+export function getBillingPlan(token: string): Promise<BillingPlan> {
+  return authedRequest<BillingPlan>("/api/v1/billing/plan", token);
+}
+
+export function createCheckout(token: string, plan: string): Promise<{ checkout_url: string }> {
+  return authedRequest<{ checkout_url: string }>("/api/v1/billing/checkout", token, {
+    method: "POST",
+    body: JSON.stringify({ plan }),
+  });
+}
+
+export interface OnboardingStatus {
+  gmail_connected: boolean;
+  gmail_user: string | null;
+  plan: string;
+}
+
+export function getOnboardingStatus(token: string): Promise<OnboardingStatus> {
+  return authedRequest<OnboardingStatus>("/api/v1/onboarding/status", token);
+}
+
+export function getGoogleConnectUrl(token: string): Promise<{ auth_url: string }> {
+  return authedRequest<{ auth_url: string }>("/api/v1/onboarding/google", token);
+}
+
+export function unsubscribe(token: string): Promise<{ unsubscribed: boolean; email: string }> {
+  return request<{ unsubscribed: boolean; email: string }>(`/api/v1/unsubscribe/${encodeURIComponent(token)}`, {
+    method: "POST",
+  });
 }

@@ -87,11 +87,14 @@ export default function CrmPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Conversion</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Pipeline Forecast</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">
-                  {stats.total_leads > 0 ? Math.round((stats.total_meetings / stats.total_leads) * 100) : 0}%
+                  ${stats.pipeline_forecast.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  stage-weighted of ${stats.pipeline_value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
               </CardContent>
             </Card>
