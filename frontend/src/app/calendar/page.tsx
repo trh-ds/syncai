@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
+import { format, startOfDay } from "date-fns";
 
 interface Meeting {
   id: string;
@@ -28,6 +28,12 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
   no_show: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300",
 };
+
+function sameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
 
 export default function CalendarPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -55,19 +61,14 @@ export default function CalendarPage() {
     };
     load();
     const interval = setInterval(load, 3000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
   const fetchMeetings = useCallback(async () => {
     try {
       const data = await apiFetch<Meeting[]>("/api/meetings");
       setMeetings(data);
-    } catch {
-      // keep existing data on polling error
-    }
+    } catch { /* keep existing on error */ }
   }, []);
 
   const handleConfirm = async (id: string) => {
@@ -90,12 +91,19 @@ export default function CalendarPage() {
     }
   };
 
+  const scheduledMeetings = meetings.filter((m) => m.status !== "cancelled");
+  const upcomingMeetings = scheduledMeetings
+    .filter((m) => new Date(m.start_at) >= new Date())
+    .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime());
+
   const selectedMeetings = meetings.filter((m) => {
     const start = new Date(m.start_at);
-    return start.toDateString() === selectedDate.toDateString();
+    return sameDay(start, selectedDate);
   });
 
-  const meetingDates = meetings.map((m) => new Date(m.start_at));
+  const meetingDays = meetings
+    .filter((m) => m.status !== "cancelled")
+    .map((m) => startOfDay(new Date(m.start_at)));
 
   return (
     <div className="space-y-6">
@@ -110,7 +118,7 @@ export default function CalendarPage() {
               onSelect={(d) => d && setSelectedDate(d)}
               month={month}
               onMonthChange={(d) => setMonth(d)}
-              modifiers={{ hasMeeting: meetingDates }}
+              modifiers={{ hasMeeting: meetingDays }}
               modifiersClassNames={{
                 hasMeeting: "font-bold underline decoration-blue-500 decoration-2 underline-offset-2",
               }}
@@ -119,82 +127,97 @@ export default function CalendarPage() {
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle>
-              {format(selectedDate, "EEEE, MMMM d, yyyy")}
-            </CardTitle>
+          <CardHeader className="pb-2">
+            <CardTitle>Upcoming Meetings</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-20 w-full" />
-                ))}
+                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
               </div>
             ) : error ? (
               <p className="text-destructive">{error}</p>
-            ) : selectedMeetings.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No meetings on this day</p>
+            ) : upcomingMeetings.length === 0 ? (
+              <p className="text-muted-foreground text-sm">No upcoming meetings</p>
             ) : (
               <div className="space-y-3">
-                {selectedMeetings.map((meeting) => (
-                  <div
+                {upcomingMeetings.map((meeting) => (
+                  <MeetingCard
                     key={meeting.id}
-                    className="flex items-start justify-between rounded-lg border p-3"
-                  >
-                    <div className="space-y-1">
-                      <p className="font-medium text-sm">{meeting.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(meeting.start_at), "h:mm a")} –{" "}
-                        {format(new Date(meeting.end_at), "h:mm a")}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {meeting.lead_name ?? "—"}
-                      </p>
-                      {meeting.hangout_link && (
-                        <a
-                          href={meeting.hangout_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-600 underline"
-                        >
-                          Join meeting
-                        </a>
-                      )}
-                      <Badge
-                        variant="outline"
-                        className={STATUS_COLORS[meeting.status] ?? ""}
-                      >
-                        {meeting.status}
-                      </Badge>
-                    </div>
-                    <div className="flex gap-1.5">
-                      {meeting.status !== "confirmed" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleConfirm(meeting.id)}
-                        >
-                          Confirm
-                        </Button>
-                      )}
-                      {meeting.status !== "cancelled" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-destructive"
-                          onClick={() => handleCancel(meeting.id)}
-                        >
-                          Cancel
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+                    meeting={meeting}
+                    onConfirm={handleConfirm}
+                    onCancel={handleCancel}
+                  />
                 ))}
               </div>
             )}
+
+            {selectedMeetings.length > 0 && (
+              <>
+                <CardTitle className="text-base mt-6 mb-3 border-t pt-4">
+                  {format(selectedDate, "EEEE, MMMM d, yyyy")}
+                </CardTitle>
+                <div className="space-y-3">
+                  {selectedMeetings.map((meeting) => (
+                    <MeetingCard
+                      key={meeting.id}
+                      meeting={meeting}
+                      onConfirm={handleConfirm}
+                      onCancel={handleCancel}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+function MeetingCard({
+  meeting,
+  onConfirm,
+  onCancel,
+}: {
+  meeting: Meeting;
+  onConfirm: (id: string) => void;
+  onCancel: (id: string) => void;
+}) {
+  const startDate = new Date(meeting.start_at);
+  return (
+    <div className="flex items-start justify-between rounded-lg border p-3">
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium">
+            {format(startDate, "MMM d, h:mm a")}
+          </span>
+          <Badge variant="outline" className={STATUS_COLORS[meeting.status] ?? ""}>
+            {meeting.status}
+          </Badge>
+        </div>
+        <p className="font-medium text-sm">{meeting.title}</p>
+        {meeting.lead_name ? (
+          <p className="text-xs text-muted-foreground">{meeting.lead_name}</p>
+        ) : meeting.lead_email ? (
+          <p className="text-xs text-muted-foreground">{meeting.lead_email}</p>
+        ) : null}
+      </div>
+      <div className="flex gap-1.5">
+        {meeting.status === "booked" && (
+          <Button size="sm" variant="outline" onClick={() => onConfirm(meeting.id)}>
+            Confirm
+          </Button>
+        )}
+        {meeting.status !== "cancelled" && (
+          <Button
+            size="sm" variant="outline" className="text-destructive"
+            onClick={() => onCancel(meeting.id)}
+          >
+            Cancel
+          </Button>
+        )}
       </div>
     </div>
   );

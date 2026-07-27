@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from config import settings
 from models import Meeting
@@ -10,11 +9,39 @@ def _parse_hours(working_hours: str) -> tuple[int, int]:
     return int(start.split(":")[0]), int(end.split(":")[0])
 
 
+async def is_slot_available(db, requested_dt: datetime, existing_meetings: list[Meeting] | None = None) -> bool:
+    from sqlalchemy import select, and_
+    from config import settings
+
+    tz = settings.chat_tz
+    start_hour, end_hour = _parse_hours(settings.chat_working_hours)
+
+    if requested_dt.weekday() >= 5:
+        return False
+    if requested_dt.hour < start_hour or requested_dt.hour >= end_hour:
+        return False
+    if requested_dt <= datetime.now(timezone.utc):
+        return False
+
+    if existing_meetings is None:
+        return True
+
+    slot_end = requested_dt + timedelta(minutes=30)
+    for m in existing_meetings:
+        if m.status == "cancelled":
+            continue
+        if m.start_at and m.end_at:
+            if requested_dt < m.end_at and slot_end > m.start_at:
+                return False
+    return True
+
+
 async def generate_slots(db, existing_meetings: list[Meeting], window_start: datetime | None = None, retry_count: int = 0) -> list[str]:
-    tz = ZoneInfo(settings.chat_tz)
     start_hour, end_hour = _parse_hours(settings.chat_working_hours)
 
     if window_start is None:
+        from zoneinfo import ZoneInfo
+        tz = ZoneInfo(settings.chat_tz)
         base = datetime.now(tz) + timedelta(days=1)
     else:
         base = window_start
@@ -22,7 +49,6 @@ async def generate_slots(db, existing_meetings: list[Meeting], window_start: dat
     if retry_count > 0:
         base += timedelta(days=retry_count)
 
-    # Collect existing meeting times to avoid conflicts
     conflict_starts: set[str] = set()
     for m in existing_meetings:
         if m.start_at:
@@ -34,7 +60,7 @@ async def generate_slots(db, existing_meetings: list[Meeting], window_start: dat
         day = base + timedelta(days=day_offset)
         day_offset += 1
 
-        if day.weekday() >= 5:  # Saturday=5, Sunday=6
+        if day.weekday() >= 5:
             continue
 
         for hour in range(start_hour, end_hour):
@@ -44,6 +70,8 @@ async def generate_slots(db, existing_meetings: list[Meeting], window_start: dat
             if slot_iso in conflict_starts:
                 continue
 
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(settings.chat_tz)
             if slot_dt <= datetime.now(tz):
                 continue
 
@@ -52,13 +80,14 @@ async def generate_slots(db, existing_meetings: list[Meeting], window_start: dat
                 break
 
     while len(slots) < 3:
-        # fallback: generate farther into the future
         fallback = base + timedelta(days=day_offset)
         day_offset += 1
         if fallback.weekday() >= 5:
             continue
         for hour in range(start_hour, end_hour):
             slot_dt = fallback.replace(hour=hour, minute=0, second=0, microsecond=0)
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(settings.chat_tz)
             if slot_dt <= datetime.now(tz):
                 continue
             slots.append(slot_dt.isoformat())
@@ -66,3 +95,4 @@ async def generate_slots(db, existing_meetings: list[Meeting], window_start: dat
                 break
 
     return slots
+
