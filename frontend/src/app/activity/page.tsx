@@ -7,11 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ActivityEvent {
-  id: string;
+  id: number;
   type: string;
-  sub_type: string;
-  timestamp: string;
-  data: Record<string, unknown>;
+  lead_id: string | null;
+  payload: Record<string, unknown> | null;
+  created_at: string;
 }
 
 interface Metrics {
@@ -19,9 +19,11 @@ interface Metrics {
 }
 
 const INTENT_COLORS: Record<string, string> = {
-  high: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-  medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
-  low: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300",
+  book: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  question: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  objection: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
+  spam: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+  oob: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300",
 };
 
 function formatMs(ms: number): string {
@@ -29,21 +31,35 @@ function formatMs(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+function isEmailEvent(type: string) {
+  return type === "email_inbound" || type === "email_outbound";
+}
+
+function isChatEvent(type: string) {
+  return type === "chat_message" || type === "meeting_booked";
+}
+
 export default function ActivityPage() {
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [inboxEvents, setInboxEvents] = useState<ActivityEvent[]>([]);
   const [chatEvents, setChatEvents] = useState<ActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
+
+    const loadInitial = async () => {
       try {
-        const data = await apiFetch<Metrics>("/api/metrics");
+        const [metricsData, activityData] = await Promise.all([
+          apiFetch<Metrics>("/api/metrics"),
+          apiFetch<ActivityEvent[]>("/api/activity/?limit=100"),
+        ]);
         if (!cancelled) {
-          setLatencyMs(Math.round(data.avg_reply_latency_s * 1000));
+          setLatencyMs(Math.round(metricsData.avg_reply_latency_s * 1000));
+          const all = activityData.reverse(); // newest first
+          setInboxEvents(all.filter((e) => isEmailEvent(e.type)));
+          setChatEvents(all.filter((e) => isChatEvent(e.type)));
         }
       } catch {
         // best-effort
@@ -51,8 +67,19 @@ export default function ActivityPage() {
         if (!cancelled) setLoading(false);
       }
     };
-    load();
+    loadInitial();
 
+    // Poll metrics for latency banner
+    const metricsInterval = setInterval(async () => {
+      try {
+        const data = await apiFetch<Metrics>("/api/metrics");
+        if (!cancelled) setLatencyMs(Math.round(data.avg_reply_latency_s * 1000));
+      } catch {
+        // ignore
+      }
+    }, 5000);
+
+    // SSE for live events
     const es = new EventSource(
       `${process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000"}/api/activity/stream`
     );
@@ -61,12 +88,9 @@ export default function ActivityPage() {
     es.onmessage = (e) => {
       try {
         const event: ActivityEvent = JSON.parse(e.data);
-        if (
-          event.type === "email_sent" ||
-          event.type === "email_received"
-        ) {
+        if (isEmailEvent(event.type)) {
           setInboxEvents((prev) => [event, ...prev].slice(0, 100));
-        } else if (event.type === "chat_message") {
+        } else if (isChatEvent(event.type)) {
           setChatEvents((prev) => [event, ...prev].slice(0, 100));
         }
       } catch {
@@ -75,11 +99,12 @@ export default function ActivityPage() {
     };
 
     es.onerror = () => {
-      setError("Activity stream disconnected");
+      // EventSource auto-reconnects; nothing to do
     };
 
     return () => {
       cancelled = true;
+      clearInterval(metricsInterval);
       es.close();
     };
   }, []);
@@ -107,9 +132,6 @@ export default function ActivityPage() {
             <CardTitle>Inbox Log</CardTitle>
           </CardHeader>
           <CardContent>
-            {error && inboxEvents.length === 0 && (
-              <p className="text-destructive text-sm mb-3">{error}</p>
-            )}
             {loading ? (
               <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
@@ -121,65 +143,60 @@ export default function ActivityPage() {
                 Waiting for activity...
               </p>
             ) : (
-              <div className="space-y-0">
-                {inboxEvents.map((event, i) => (
-                  <div
-                    key={event.id}
-                    className={`flex flex-col gap-1 py-3 border-b last:border-0 ${
-                      i < 3 ? "animate-slide-in" : ""
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(event.timestamp).toLocaleTimeString()}
-                      </span>
-                      <span className="text-xs font-medium">
-                        {event.data &&
-                        typeof event.data === "object" &&
-                        "from" in event.data
-                          ? String(event.data.from)
-                          : "—"}
-                      </span>
-                      {event.data &&
-                        typeof event.data === "object" &&
-                        "subject" in event.data && (
+              <div className="space-y-0 max-h-[500px] overflow-y-auto">
+                {inboxEvents.map((event, i) => {
+                  const p = event.payload ?? {};
+                  const isInbound = event.type === "email_inbound";
+                  return (
+                    <div
+                      key={`${event.id}-${i}`}
+                      className={`flex flex-col gap-1 py-3 border-b last:border-0 ${
+                        i < 3 ? "animate-[slideIn_0.3s_ease-out]" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(event.created_at).toLocaleTimeString()}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={isInbound
+                            ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                            : "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                          }
+                        >
+                          {isInbound ? "Inbound" : "Outbound"}
+                        </Badge>
+                        {typeof p.from === "string" && (
+                          <span className="text-xs font-medium">{p.from}</span>
+                        )}
+                        {typeof p.to === "string" && (
+                          <span className="text-xs font-medium">→ {p.to}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {typeof p.subject === "string" && (
                           <span className="text-xs font-medium truncate max-w-[200px]">
-                            {String(event.data.subject)}
+                            {p.subject}
                           </span>
                         )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {event.data &&
-                        typeof event.data === "object" &&
-                        "intent" in event.data && (
+                        {typeof p.intent === "string" && (
                           <Badge
                             variant="outline"
-                            className={
-                              INTENT_COLORS[
-                                String(event.data.intent).toLowerCase()
-                              ] ?? ""
-                            }
+                            className={INTENT_COLORS[String(p.intent).toLowerCase()] ?? ""}
                           >
-                            {String(event.data.intent)}
+                            {String(p.intent)}
                           </Badge>
                         )}
-                      {event.data &&
-                        typeof event.data === "object" &&
-                        "reply_latency_ms" in event.data && (
+                        {typeof p.reply_latency_ms === "number" && (
                           <Badge variant="outline">
-                            {formatMs(Number(event.data.reply_latency_ms))}
+                            {formatMs(p.reply_latency_ms)}
                           </Badge>
                         )}
+                      </div>
                     </div>
-                    {event.data &&
-                      typeof event.data === "object" &&
-                      "ai_reply" in event.data && (
-                        <p className="text-xs text-muted-foreground truncate max-w-md">
-                          {String(event.data.ai_reply)}
-                        </p>
-                      )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -201,48 +218,42 @@ export default function ActivityPage() {
                 Waiting for activity...
               </p>
             ) : (
-              <div className="space-y-0">
-                {chatEvents.map((event, i) => (
-                  <div
-                    key={event.id}
-                    className={`flex flex-col gap-1 py-3 border-b last:border-0 ${
-                      i < 3 ? "animate-slide-in" : ""
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(event.timestamp).toLocaleTimeString()}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className={
-                          event.sub_type === "inbound"
-                            ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-                            : "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
-                        }
-                      >
-                        {event.sub_type}
-                      </Badge>
-                      {event.data &&
-                        typeof event.data === "object" &&
-                        "state" in event.data && (
-                          <Badge variant="outline">
-                            {String(event.data.state)}
-                          </Badge>
-                        )}
-                    </div>
-                    {event.data &&
-                      typeof event.data === "object" &&
-                      "text" in event.data && (
-                        <p className="text-sm truncate max-w-md">
-                          {String(event.data.text)}
+              <div className="space-y-0 max-h-[500px] overflow-y-auto">
+                {chatEvents.map((event, i) => {
+                  const p = event.payload ?? {};
+                  return (
+                    <div
+                      key={`${event.id}-${i}`}
+                      className={`flex flex-col gap-1 py-3 border-b last:border-0 ${
+                        i < 3 ? "animate-[slideIn_0.3s_ease-out]" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(event.created_at).toLocaleTimeString()}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={
+                            event.type === "meeting_booked"
+                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                              : "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+                          }
+                        >
+                          {event.type === "meeting_booked" ? "Booked" : event.type.replace(/_/g, " ")}
+                        </Badge>
+                      </div>
+                      {typeof p.text === "string" && (
+                        <p className="text-sm truncate max-w-md">{p.text}</p>
+                      )}
+                      {typeof p.title === "string" && (
+                        <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                          {p.title}
                         </p>
                       )}
-                    {event.type === "meeting_booked" && (
-                      <Badge className="w-fit bg-green-500">Booked</Badge>
-                    )}
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>

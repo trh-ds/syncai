@@ -13,16 +13,20 @@ import { format } from "date-fns";
 interface Meeting {
   id: string;
   title: string;
-  start_time: string;
-  end_time: string;
+  start_at: string;
+  end_at: string;
   status: string;
-  lead: { first_name: string; last_name: string };
+  lead_name: string | null;
+  lead_email: string | null;
+  hangout_link: string | null;
 }
 
 const STATUS_COLORS: Record<string, string> = {
   confirmed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+  booked: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
+  completed: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
   cancelled: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+  no_show: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300",
 };
 
 export default function CalendarPage() {
@@ -87,11 +91,11 @@ export default function CalendarPage() {
   };
 
   const selectedMeetings = meetings.filter((m) => {
-    const start = new Date(m.start_time);
+    const start = new Date(m.start_at);
     return start.toDateString() === selectedDate.toDateString();
   });
 
-  const meetingDates = meetings.map((m) => new Date(m.start_time));
+  const meetingDates = meetings.map((m) => new Date(m.start_at));
 
   return (
     <div className="space-y-6">
@@ -141,12 +145,22 @@ export default function CalendarPage() {
                     <div className="space-y-1">
                       <p className="font-medium text-sm">{meeting.title}</p>
                       <p className="text-xs text-muted-foreground">
-                        {format(new Date(meeting.start_time), "h:mm a")} –{" "}
-                        {format(new Date(meeting.end_time), "h:mm a")}
+                        {format(new Date(meeting.start_at), "h:mm a")} –{" "}
+                        {format(new Date(meeting.end_at), "h:mm a")}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {meeting.lead.first_name} {meeting.lead.last_name}
+                        {meeting.lead_name ?? "—"}
                       </p>
+                      {meeting.hangout_link && (
+                        <a
+                          href={meeting.hangout_link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 underline"
+                        >
+                          Join meeting
+                        </a>
+                      )}
                       <Badge
                         variant="outline"
                         className={STATUS_COLORS[meeting.status] ?? ""}

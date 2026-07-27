@@ -21,10 +21,11 @@ interface ChatResponse {
   state: string;
   proposed_times?: string[];
   booked_meeting?: {
-    meet_link: string;
-    start_time: string;
-    end_time: string;
-  };
+    hangout_link: string;
+    start_at: string;
+    end_at: string;
+    title: string;
+  } | null;
 }
 
 const STATE_LABELS: Record<string, string> = {
@@ -145,18 +146,18 @@ export default function DemoChatPage() {
             <p className="text-sm">
               <span className="font-medium">Link:</span>{" "}
               <a
-                href={bookedMeeting.meet_link}
+                href={bookedMeeting.hangout_link}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 underline"
               >
-                {bookedMeeting.meet_link}
+                {bookedMeeting.hangout_link}
               </a>
             </p>
             <p className="text-sm">
               <span className="font-medium">Time:</span>{" "}
-              {new Date(bookedMeeting.start_time).toLocaleString()} –{" "}
-              {new Date(bookedMeeting.end_time).toLocaleTimeString()}
+              {new Date(bookedMeeting.start_at).toLocaleString()} –{" "}
+              {new Date(bookedMeeting.end_at).toLocaleTimeString()}
             </p>
           </CardContent>
         </Card>
