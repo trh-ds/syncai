@@ -17,7 +17,7 @@ async def sync_apollo_leads(db: AsyncSession) -> int:
 
     async with httpx.AsyncClient() as client:
         resp = await client.post(
-            "https://api.apollo.io/v1/people/search",
+            "https://api.apollo.io/api/v1/mixed_people/search",
             headers={
                 "Content-Type": "application/json",
                 "X-Api-Key": settings.apollo_api_key,
