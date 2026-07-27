@@ -2,24 +2,30 @@ import json
 import os
 
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import Flow
 
 from config import settings
 
 
 def _client_config() -> dict:
     return {
-        "installed": {
+        "web": {
             "client_id": settings.gcp_client_id,
             "client_secret": settings.gcp_client_secret,
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": ["http://localhost:8000/auth/callback"],
         }
     }
 
 
-def get_oauth_flow(redirect_uri: str, scopes: list[str]) -> InstalledAppFlow:
-    return InstalledAppFlow.from_client_config(_client_config(), scopes, redirect_uri=redirect_uri)
+def get_oauth_flow(redirect_uri: str, scopes: list[str]) -> Flow:
+    return Flow.from_client_config(
+        _client_config(),
+        scopes=scopes,
+        redirect_uri=redirect_uri,
+        autogenerate_code_verifier=False,
+    )
 
 
 def _save_refresh_token(token: str):
