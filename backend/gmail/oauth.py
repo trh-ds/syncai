@@ -1,31 +1,49 @@
 import json
 import os
+import urllib.parse
 
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
 
 from config import settings
 
+REDIRECT_URI = "http://localhost:8000/auth/callback"
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.modify",
+    "https://www.googleapis.com/auth/calendar.events",
+    "openid",
+    "email",
+    "profile",
+]
 
-def _client_config() -> dict:
-    return {
-        "web": {
-            "client_id": settings.gcp_client_id,
-            "client_secret": settings.gcp_client_secret,
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": ["http://localhost:8000/auth/callback"],
-        }
+
+def get_auth_url() -> str:
+    params = {
+        "client_id": settings.gcp_client_id,
+        "redirect_uri": REDIRECT_URI,
+        "response_type": "code",
+        "scope": " ".join(SCOPES),
+        "access_type": "offline",
+        "prompt": "consent",
     }
+    return "https://accounts.google.com/o/oauth2/auth?" + urllib.parse.urlencode(params)
 
 
-def get_oauth_flow(redirect_uri: str, scopes: list[str]) -> Flow:
-    return Flow.from_client_config(
-        _client_config(),
-        scopes=scopes,
-        redirect_uri=redirect_uri,
-        autogenerate_code_verifier=False,
-    )
+async def exchange_code(code: str) -> dict:
+    import httpx
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "code": code,
+                "client_id": settings.gcp_client_id,
+                "client_secret": settings.gcp_client_secret,
+                "redirect_uri": REDIRECT_URI,
+                "grant_type": "authorization_code",
+            },
+            timeout=30.0,
+        )
+        resp.raise_for_status()
+        return resp.json()
 
 
 def _save_refresh_token(token: str):

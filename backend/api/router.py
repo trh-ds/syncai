@@ -1,26 +1,14 @@
 from fastapi import APIRouter, Request
 from starlette.responses import RedirectResponse, JSONResponse
 
-from config import settings
-from gmail.oauth import get_oauth_flow
+from gmail.oauth import get_auth_url, exchange_code, _save_refresh_token
 
 router = APIRouter()
-
-REDIRECT_URI = "http://localhost:8000/auth/callback"
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.modify",
-    "https://www.googleapis.com/auth/calendar.events",
-    "openid",
-    "email",
-    "profile",
-]
 
 
 @router.get("/auth/start")
 async def auth_start():
-    flow = get_oauth_flow(REDIRECT_URI, SCOPES)
-    url, _ = flow.authorization_url(prompt="consent", access_type="offline")
-    return RedirectResponse(url)
+    return RedirectResponse(get_auth_url())
 
 
 @router.get("/auth/callback")
@@ -29,32 +17,22 @@ async def auth_callback(request: Request):
     if not code:
         return JSONResponse({"error": "no code"}, status_code=400)
 
-    flow = get_oauth_flow(REDIRECT_URI, SCOPES)
-    flow.fetch_token(code=code)
-    creds = flow.credentials
-    refresh_token = creds.refresh_token
+    try:
+        token_data = await exchange_code(code)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    refresh_token = token_data.get("refresh_token")
+    access_token = token_data.get("access_token")
 
     if refresh_token:
-        try:
-            with open(".env", "r") as f:
-                lines = f.readlines()
-        except FileNotFoundError:
-            lines = []
-
-        found = False
-        for i, line in enumerate(lines):
-            if line.startswith("GMAIL_REFRESH_TOKEN="):
-                lines[i] = f"GMAIL_REFRESH_TOKEN={refresh_token}\n"
-                found = True
-                break
-        if not found:
-            lines.append(f"GMAIL_REFRESH_TOKEN={refresh_token}\n")
-        with open(".env", "w") as f:
-            f.writelines(lines)
+        _save_refresh_token(refresh_token)
 
     return JSONResponse({
         "refresh_token": refresh_token,
-        "email": creds.id_token.get("email") if creds.id_token else None,
+        "access_token": access_token,
+        "token_type": token_data.get("token_type"),
+        "expires_in": token_data.get("expires_in"),
     })
 
 

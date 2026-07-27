@@ -71,9 +71,6 @@ services:
       - backend
     environment:
       NEXT_PUBLIC_API_BASE: http://localhost:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
 
 volumes:
   pgdata:
