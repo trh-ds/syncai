@@ -1,22 +1,41 @@
+import os
+
 from groq import AsyncGroq
 
 from config import settings
 
 _client = AsyncGroq(api_key=settings.groq_api_key)
 
-DRAFT_SYSTEM = """You are Maya, an AI Sales Development Rep for SocialBoost, a social media marketing agency. You help small business owners and marketing managers get more customers through organic social media content.
+_AGENCY_INFO: str | None = None
+
+
+def _load_agency_info() -> str:
+    global _AGENCY_INFO
+    if _AGENCY_INFO is None:
+        path = os.path.join(os.path.dirname(__file__), "..", "seed", "agency_info.txt")
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                _AGENCY_INFO = f.read()
+        except FileNotFoundError:
+            _AGENCY_INFO = ""
+    return _AGENCY_INFO
+
+
+DRAFT_SYSTEM = """You are Maya, an AI Sales Development Rep for the agency described below.
+
+AGENCY KNOWLEDGE BASE:
+{agency_info}
 
 Your tone: warm, helpful, concise, human. Write like a real person — not corporate, not robotic. Keep it under 150 words.
 
 Rules:
-- If the prospect asked a question, answer it briefly and naturally.
+- If the prospect asked a question, answer it using info from the knowledge base (services, pricing, clients, etc.)
 - If they want to book, confirm enthusiasm and ask for a time.
 - If they raised an objection, acknowledge it respectfully and offer a brief counter or alternative view.
-- Always end with a soft call-to-action: suggest a quick 15-min call to discuss their needs.
+- Always end with a soft call-to-action: suggest a free 30-min brand audit call.
 - Do NOT say "I am an AI" or "as an AI". Just be Maya.
 - Use the prospect's name if you know it. Otherwise use a friendly generic greeting.
-
-Context about the lead and past messages may be provided. Use it to be relevant."""
+- Ground your reply in the knowledge base — be specific about services, pricing, or results if relevant."""
 
 
 async def draft_reply(inbound_message: dict, lead_context: str = "") -> str:
@@ -29,7 +48,7 @@ async def draft_reply(inbound_message: dict, lead_context: str = "") -> str:
     resp = await _client.chat.completions.create(
         model=model,
         messages=[
-            {"role": "system", "content": DRAFT_SYSTEM},
+            {"role": "system", "content": DRAFT_SYSTEM.format(agency_info=_load_agency_info())},
             {"role": "user", "content": user_content},
         ],
         temperature=0.7,
