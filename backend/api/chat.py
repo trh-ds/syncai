@@ -24,7 +24,6 @@ from chat.session import (
 )
 from chat.llm_turn import process_turn
 from chat.slots import generate_slots
-from gcal.client import insert_event
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -89,7 +88,9 @@ async def chat_message(body: ChatMessageIn, db: AsyncSession = Depends(get_db)):
             reply = reply or "Great! What kind of social media help are you looking for?"
         elif current_state == STATE_INTENT_CONFIRM:
             await update_session_state(db, session, STATE_PROPOSE_TIMES)
-            slots = await generate_slots(db, [])
+            meeting_result = await db.execute(select(Meeting).where(Meeting.status.notin_(["cancelled"])))
+            existing = list(meeting_result.scalars().all())
+            slots = await generate_slots(db, existing)
             session.proposed_slots = slots
             proposed_times = slots
             reply = reply or "Awesome — here are a few times I'm free. Which works best?"
@@ -102,20 +103,12 @@ async def chat_message(body: ChatMessageIn, db: AsyncSession = Depends(get_db)):
             if slot:
                 start_dt = datetime.fromisoformat(slot)
                 end_dt = start_dt + timedelta(minutes=30)
-                event = await insert_event(
-                    summary=f"ASDR Demo - {lead.email}",
-                    start_dt=start_dt,
-                    end_dt=end_dt,
-                    attendee_emails=[lead.email] if lead.email else [],
-                )
                 meeting = Meeting(
                     lead_id=lead.id,
                     source="chat",
-                    google_event_id=event.get("id", ""),
                     title=f"ASDR Demo - {lead.email}",
                     start_at=start_dt,
                     end_at=end_dt,
-                    hangout_link=event.get("hangoutLink"),
                     status="booked",
                 )
                 db.add(meeting)
@@ -145,7 +138,9 @@ async def chat_message(body: ChatMessageIn, db: AsyncSession = Depends(get_db)):
     elif classification == "propose_alt":
         if current_state == STATE_PROPOSE_TIMES:
             session.retry_count = (session.retry_count or 0) + 1
-            slots = await generate_slots(db, [], retry_count=session.retry_count)
+            meeting_result = await db.execute(select(Meeting).where(Meeting.status.notin_(["cancelled"])))
+            existing = list(meeting_result.scalars().all())
+            slots = await generate_slots(db, existing, retry_count=session.retry_count)
             session.proposed_slots = slots
             proposed_times = slots
             reply = reply or "No worries — how about one of these instead?"

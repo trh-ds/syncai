@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -10,7 +10,6 @@ from db.session import get_db
 from events import emit
 from models import Lead, Meeting
 from schemas import MeetingBookIn, MeetingOut
-from gcal.client import insert_event
 
 router = APIRouter(prefix="/api/meetings", tags=["meetings"])
 
@@ -39,21 +38,12 @@ async def book_meeting(body: MeetingBookIn, db: AsyncSession = Depends(get_db)):
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
-    event = await insert_event(
-        summary=body.title,
-        start_dt=body.start_at,
-        end_dt=body.end_at,
-        attendee_emails=[lead.email] if lead.email else [],
-    )
-
     meeting = Meeting(
         lead_id=lead.id,
         source=body.source,
-        google_event_id=event.get("id", ""),
         title=body.title,
         start_at=body.start_at,
         end_at=body.end_at,
-        hangout_link=event.get("hangoutLink"),
         status="booked",
     )
     db.add(meeting)
@@ -72,7 +62,6 @@ async def book_meeting(body: MeetingBookIn, db: AsyncSession = Depends(get_db)):
             "meeting_id": str(meeting.id),
             "title": body.title,
             "start_at": body.start_at.isoformat(),
-            "hangout_link": meeting.hangout_link,
         },
     })
 

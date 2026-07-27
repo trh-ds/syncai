@@ -75,7 +75,7 @@ async def gmail_poller():
             service = build("gmail", "v1", credentials=creds)
 
             last_history_id = await _get_kv("gmail_last_history_id")
-            if not last_history_id:
+            if not last_history_id or last_history_id == "0":
                 profile = service.users().getProfile(userId="me").execute()
                 last_history_id = str(profile.get("historyId", "1"))
                 await _set_kv("gmail_last_history_id", last_history_id)
