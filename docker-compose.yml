@@ -10,7 +10,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U asdr -d asdr_demo"]
+      test: ["CMD-SHELL", "pg_isready -U asdr"]
       interval: 3s
       timeout: 3s
       retries: 10

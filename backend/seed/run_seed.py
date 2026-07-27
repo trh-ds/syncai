@@ -130,31 +130,31 @@ async def seed():
                 "status": "booked", "apollo_person_id": f"apollo_{18+i}",
                 "enriched_data": sl, "days": random.randint(1, 8),
             })
-        # 2 more booked
+        # 2 more booked (unique emails, not in sample JSON)
         leads_data.append({
-            "org": extra_orgs[0], "first_name": "Sachin", "last_name": "Tendulkar",
-            "email": "sachin@pixelpop.co", "title": "Co-Founder",
-            "linkedin_url": "https://linkedin.com/in/sachint", "source": "apollo",
-            "status": "booked", "apollo_person_id": "apollo_20", "enriched_data": {}, "days": 3,
+            "org": extra_orgs[0], "first_name": "Tara", "last_name": "Mehta",
+            "email": "tara@pixelpop.co", "title": "Creative Director",
+            "linkedin_url": "https://linkedin.com/in/taramehta", "source": "apollo",
+            "status": "booked", "apollo_person_id": None, "enriched_data": {}, "days": 3,
         })
         leads_data.append({
-            "org": extra_orgs[1], "first_name": "Nitin", "last_name": "Bose",
-            "email": "nitin@metricmax.in", "title": "CEO",
-            "linkedin_url": "https://linkedin.com/in/nitinbose", "source": "email_inbound",
+            "org": extra_orgs[1], "first_name": "Arvind", "last_name": "Kumar",
+            "email": "arvind@metricmax.in", "title": "COO",
+            "linkedin_url": "https://linkedin.com/in/arvindkumar", "source": "email_inbound",
             "status": "booked", "apollo_person_id": None, "enriched_data": {}, "days": 5,
         })
-        # 1 no_show
+        # 1 no_show (unique email)
         leads_data.append({
-            "org": org_list[15], "first_name": "Ritu", "last_name": "Chopra",
-            "email": "ritu@engagefirst.co", "title": "Marketing Director",
-            "linkedin_url": "https://linkedin.com/in/rituchopra", "source": "apollo_sample",
+            "org": extra_orgs[2], "first_name": "Lakshmi", "last_name": "Rao",
+            "email": "lakshmi@creatorengine.io", "title": "Head of Sales",
+            "linkedin_url": "https://linkedin.com/in/lakshmirao", "source": "apollo_sample",
             "status": "no_show", "apollo_person_id": None, "enriched_data": {}, "days": 7,
         })
-        # 1 lost
+        # 1 lost (unique email)
         leads_data.append({
-            "org": org_list[16], "first_name": "Deepak", "last_name": "Agarwal",
-            "email": "deepak@creatorengine.io", "title": "VP Growth",
-            "linkedin_url": "https://linkedin.com/in/deepakagarwal", "source": "email_inbound",
+            "org": extra_orgs[3], "first_name": "Sanjay", "last_name": "Pillai",
+            "email": "sanjay@scaleupmedia.agency", "title": "Marketing Manager",
+            "linkedin_url": "https://linkedin.com/in/sanjaypillai", "source": "email_inbound",
             "status": "lost", "apollo_person_id": None, "enriched_data": {}, "days": 10,
         })
 
