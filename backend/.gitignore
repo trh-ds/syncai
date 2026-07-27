@@ -1,7 +1,0 @@
-.env
-__pycache__/
-*.pyc
-*.pyo
-venv/
-.chroma_cache/
-chroma_data/
