@@ -27,14 +27,22 @@ interface Lead {
   title: string;
   source: string;
   status: string;
-  org: { name: string };
+  org_name: string | null;
   last_activity_at: string | null;
 }
 
 const SOURCE_COLORS: Record<string, string> = {
   apollo: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-  inbound: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-  sample: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  apollo_sample: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
+  email_inbound: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  manual: "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300",
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  apollo: "Apollo",
+  apollo_sample: "Sample",
+  email_inbound: "Inbound",
+  manual: "Manual",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -120,7 +128,7 @@ export default function LeadsPage() {
         lead.first_name.toLowerCase().includes(q) ||
         lead.last_name.toLowerCase().includes(q) ||
         lead.email.toLowerCase().includes(q) ||
-        lead.org.name.toLowerCase().includes(q);
+        (lead.org_name ?? "").toLowerCase().includes(q);
       const matchesSource = !sourceFilter || lead.source === sourceFilter;
       const matchesStatus = !statusFilter || lead.status === statusFilter;
       return matchesSearch && matchesSource && matchesStatus;
@@ -219,7 +227,7 @@ export default function LeadsPage() {
                     <TableCell className="font-medium">
                       {lead.first_name} {lead.last_name}
                     </TableCell>
-                    <TableCell>{lead.org.name}</TableCell>
+                    <TableCell>{lead.org_name ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {lead.title || "—"}
                     </TableCell>
@@ -228,7 +236,7 @@ export default function LeadsPage() {
                         variant="outline"
                         className={SOURCE_COLORS[lead.source] ?? ""}
                       >
-                        {lead.source}
+                        {SOURCE_LABELS[lead.source] ?? lead.source}
                       </Badge>
                     </TableCell>
                     <TableCell>
