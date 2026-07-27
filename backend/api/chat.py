@@ -31,7 +31,16 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 @router.post("/message", response_model=ChatMessageOut)
 async def chat_message(body: ChatMessageIn, db: AsyncSession = Depends(get_db)):
-    lead = await db.get(Lead, UUID(body.lead_id))
+    # Try by UUID first, then by the chat-generated email
+    lead = None
+    try:
+        lead = await db.get(Lead, UUID(body.lead_id))
+    except (ValueError, Exception):
+        pass
+    if not lead:
+        chat_email = f"chat-{body.lead_id}@unknown.com"
+        result = await db.execute(select(Lead).where(Lead.email == chat_email))
+        lead = result.scalar_one_or_none()
     if not lead:
         lead = Lead(
             email=f"chat-{body.lead_id}@unknown.com",
