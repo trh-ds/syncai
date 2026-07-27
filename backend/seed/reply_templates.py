@@ -3,54 +3,54 @@ REPLY_TEMPLATES = [
         "subject_prefix": "Re: Quick question about your services",
         "body": """Hi {first_name},
 
-Thanks for reaching out! I'd love to tell you more about how we've helped social media agencies like yours grow their client base.
+Thanks for reaching out! I'd love to tell you more about how we've helped brands like yours stand out.
 
-We specialize in outbound lead generation that feels personal, not robotic. Our AI handles the top-of-funnel so your team can focus on closing.
+At SocialBoost, we do brand identity, strategy, and social media content — all under one roof. Our team has worked with 60+ brands across FMCG, D2C, and hospitality.
 
-Are you free for a quick 15-minute call this week? I can walk you through a few case studies from agencies similar to {company}.
+Are you free for a free 30-minute brand audit call this week? I can walk you through a few case studies relevant to {company}.
 
 Best,
-Maya | ASDR"""
+Maya | SocialBoost"""
     },
     {
         "subject_prefix": "Re: Interested in partnership",
         "body": """Hello {first_name},
 
-Great to hear from you! A partnership sounds exciting — we're always looking to work with forward-thinking agencies like {company}.
+Great to hear from you! A partnership sounds exciting — we're always looking to work with forward-thinking brands like {company}.
 
-Our platform helps agencies add 3-5 qualified meetings per week to their pipeline without hiring additional SDRs. Happy to share some numbers from our current partners.
+We offer brand strategy, identity design, and ongoing social content. Most of our clients see measurable results within the first quarter — like BrewCraft Coffee's 40% increase in walk-ins after their rebrand.
 
 Would Wednesday or Thursday work for a brief chat?
 
 Cheers,
-Maya | ASDR"""
+Maya | SocialBoost"""
     },
     {
         "subject_prefix": "Re: Pricing inquiry",
         "body": """Hi {first_name},
 
-Pricing varies based on your outreach volume and target industries, but most agencies in our network see ROI within the first 30 days.
+Happy to share pricing! Our brand identity packages start at Rs 75,000, brand strategy at Rs 1,20,000, and social media content at Rs 40,000/month. All fixed pricing — no hourly surprises.
 
-Instead of a blind quote, let me understand your current pipeline and I'll put together numbers that make sense for {company}. No pressure, no minimum commitment.
+Instead of a blind quote, let me understand your current brand and I'll put together numbers that make sense for {company}. No pressure, no minimum commitment.
 
 Got 10 minutes this week?
 
-Maya | ASDR"""
+Maya | SocialBoost"""
     },
     {
         "subject_prefix": "Re: Demo request",
         "body": """Hi {first_name},
 
-Absolutely — I'd love to show you the platform in action. Our demos are live, not pre-recorded, so you'll see real pipelines and real results.
+Absolutely — I'd love to show you what we can do. Our brand audit calls are live, not pre-recorded, so you'll see real work and real results.
 
 I typically walk through:
-- How our AI qualifies inbound leads
-- The chatbot that books meetings while you sleep
-- Real conversion numbers from agencies your size
+- How we approach brand strategy and identity
+- Social media content that actually converts
+- Real case studies from brands your size
 
 How does Friday at 3 PM IST sound? Or pick a slot that works for {company}.
 
-Maya | ASDR"""
+Maya | SocialBoost"""
     },
     {
         "subject_prefix": "Re: Not interested right now",
@@ -58,22 +58,22 @@ Maya | ASDR"""
 
 Totally understand — timing isn't always right. No hard feelings at all.
 
-I'll check back in a couple of months if that's okay. In the meantime, if you ever want to benchmark {company}'s outbound metrics against similar agencies, my inbox is open.
+I'll check back in a couple of months if that's okay. In the meantime, if you ever want to benchmark {company}'s brand presence against similar companies, my inbox is open.
 
 Wishing you a strong quarter ahead.
 
-Maya | ASDR"""
+Maya | SocialBoost"""
     },
     {
         "subject_prefix": "Re: Tell me more",
         "body": """Hi {first_name},
 
-Happy to share more! The short version: we built ASDR because agencies were spending too much on SDR headcount for inconsistent results.
+Happy to share more! The short version: we built SocialBoost because brands were spending too much on big agencies for inconsistent work.
 
-Our AI handles email outreach, lead qualification, and even meeting booking — giving your team back 15-20 hours a week. Agencies like {company} typically see their first booked meeting within 48 hours of setup.
+We handle brand identity, strategy, and social content — giving you senior people on every project with 5-day turnaround on concepts. Brands like Terra Organics saw 2x DTC sales after their packaging redesign with us.
 
 Want me to send over a one-pager, or would you prefer a live walkthrough?
 
-Maya | ASDR"""
+Maya | SocialBoost"""
     }
 ]
