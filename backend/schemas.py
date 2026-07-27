@@ -97,14 +97,14 @@ class ActivityEventOut(BaseModel):
 
 # --- Metrics ---
 class MetricsOut(BaseModel):
-    leads_count: int
-    meetings_count: int
+    leads_captured: int
+    meetings_booked: int
+    meetings_booked_pct: float
     est_cost_saved: float
     est_hours_saved: float
-    avg_reply_latency_ms: int
-    success_rate: float
+    avg_reply_latency_s: float
     pipeline: dict[str, int]
-    activity_sparkline: list[dict]
+    activity_14d: list[dict]
 
 
 # --- Email (for activity display) ---

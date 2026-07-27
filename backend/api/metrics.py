@@ -10,6 +10,12 @@ from schemas import MetricsOut
 
 router = APIRouter(prefix="/api/metrics", tags=["metrics"])
 
+PIPELINE_KEYS = ["captured", "contacted", "replied", "booked", "no_show", "lost"]
+
+
+def _normalize_pipeline(raw: dict) -> dict:
+    return {k: raw.get(k, 0) for k in PIPELINE_KEYS}
+
 
 @router.get("/", response_model=MetricsOut)
 async def get_metrics(db: AsyncSession = Depends(get_db)):
@@ -19,7 +25,7 @@ async def get_metrics(db: AsyncSession = Depends(get_db)):
     pipeline_result = await db.execute(
         select(Lead.status, func.count(Lead.id)).group_by(Lead.status)
     )
-    pipeline = {row[0] or "unknown": row[1] for row in pipeline_result.all()}
+    pipeline = _normalize_pipeline({row[0] or "unknown": row[1] for row in pipeline_result.all()})
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=14)
     sparkline_result = await db.execute(
@@ -37,15 +43,17 @@ async def get_metrics(db: AsyncSession = Depends(get_db)):
     ]
 
     if cache:
+        lc = cache.leads_count
+        mc = cache.meetings_count
         return MetricsOut(
-            leads_count=cache.leads_count,
-            meetings_count=cache.meetings_count,
+            leads_captured=lc,
+            meetings_booked=mc,
+            meetings_booked_pct=round(mc / max(lc, 1) * 100, 1),
             est_cost_saved=cache.est_cost_saved,
             est_hours_saved=cache.est_hours_saved,
-            avg_reply_latency_ms=cache.avg_reply_latency_ms,
-            success_rate=cache.success_rate,
+            avg_reply_latency_s=round(cache.avg_reply_latency_ms / 1000, 1),
             pipeline=pipeline,
-            activity_sparkline=sparkline,
+            activity_14d=sparkline,
         )
     else:
         lead_count_result = await db.execute(select(func.count(Lead.id)))
@@ -54,14 +62,14 @@ async def get_metrics(db: AsyncSession = Depends(get_db)):
         mc = meeting_count_result.scalar() or 0
 
         return MetricsOut(
-            leads_count=lc,
-            meetings_count=mc,
+            leads_captured=lc,
+            meetings_booked=mc,
+            meetings_booked_pct=round(mc / max(lc, 1) * 100, 1),
             est_cost_saved=0,
             est_hours_saved=0,
-            avg_reply_latency_ms=0,
-            success_rate=0.0,
+            avg_reply_latency_s=0,
             pipeline=pipeline,
-            activity_sparkline=sparkline,
+            activity_14d=sparkline,
         )
 
 
@@ -106,7 +114,7 @@ async def recompute_metrics(db: AsyncSession = Depends(get_db)):
     pipeline_result = await db.execute(
         select(Lead.status, func.count(Lead.id)).group_by(Lead.status)
     )
-    pipeline = {row[0] or "unknown": row[1] for row in pipeline_result.all()}
+    pipeline = _normalize_pipeline({row[0] or "unknown": row[1] for row in pipeline_result.all()})
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=14)
     sparkline_result = await db.execute(
@@ -124,12 +132,12 @@ async def recompute_metrics(db: AsyncSession = Depends(get_db)):
     ]
 
     return MetricsOut(
-        leads_count=leads_count,
-        meetings_count=meetings_count,
+        leads_captured=leads_count,
+        meetings_booked=meetings_count,
+        meetings_booked_pct=round(meetings_count / max(leads_count, 1) * 100, 1),
         est_cost_saved=est_cost_saved,
         est_hours_saved=est_hours_saved,
-        avg_reply_latency_ms=avg_reply_latency_ms,
-        success_rate=success_rate,
+        avg_reply_latency_s=round(avg_reply_latency_ms / 1000, 1),
         pipeline=pipeline,
-        activity_sparkline=sparkline,
+        activity_14d=sparkline,
     )
