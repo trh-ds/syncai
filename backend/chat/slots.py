@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from config import settings
-from calendar.client import list_events
+from gcal.client import list_events
 
 
 def _parse_hours(hours_str: str) -> tuple[int, int]:

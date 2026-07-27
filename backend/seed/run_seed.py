@@ -51,7 +51,8 @@ async def seed():
 
     async with async_session() as db:
         print("Wiping existing data...")
-        for table in [ActivityEvent, ChatMessage, ChatSession, Meeting, EmailMessage, EmailThread, Lead, Organization, DemoMetricsCache]:
+        from models import KV
+        for table in [ActivityEvent, ChatMessage, ChatSession, Meeting, EmailMessage, EmailThread, Lead, Organization, KV, DemoMetricsCache]:
             await db.execute(delete(table))
 
         # --- Organizations ---
@@ -401,7 +402,6 @@ async def seed():
         db.add(cache)
 
         # --- KV ---
-        from models import KV
         db.add(KV(key="gmail_last_history_id", value="0"))
 
         await db.commit()

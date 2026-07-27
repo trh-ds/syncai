@@ -10,7 +10,7 @@ from db.session import get_db
 from events import emit
 from models import Lead, Meeting
 from schemas import MeetingBookIn, MeetingOut
-from calendar.client import insert_event
+from gcal.client import insert_event
 
 router = APIRouter(prefix="/api/meetings", tags=["meetings"])
 

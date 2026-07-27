@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from starlette.responses import RedirectResponse, JSONResponse
 
 from config import settings
-from gmail.oauth import get_oauth_flow, exchange_code
+from gmail.oauth import get_oauth_flow
 
 router = APIRouter()
 

@@ -24,7 +24,7 @@ from chat.session import (
 )
 from chat.llm_turn import process_turn
 from chat.slots import generate_slots
-from calendar.client import insert_event
+from gcal.client import insert_event
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
