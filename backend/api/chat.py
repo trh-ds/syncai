@@ -67,19 +67,33 @@ async def chat_message(body: ChatMessageIn, db: AsyncSession = Depends(get_db)):
     booked_meeting: MeetingOut | None = None
     current_state = session.state
 
-    # --- Extract contact info ---
+    # --- Extract and persist contact info ---
     name = (turn.get("name") or "").strip()
     company = (turn.get("company") or "").strip()
     email = (turn.get("email") or "").strip()
 
-    if name and not lead.first_name:
+    # Always update lead with any new info extracted by the LLM
+    if name and " " in name:
         parts = name.split(maxsplit=1)
-        lead.first_name = parts[0]
-        lead.last_name = parts[1] if len(parts) > 1 else ""
-    if company and not lead.title:
-        lead.title = company  # ponytail: store company in title until we add a real field
-    if email and "@" in email and lead.email.startswith("chat-"):
-        lead.email = email
+        if not lead.first_name or lead.first_name.lower() != parts[0].lower():
+            lead.first_name = parts[0]
+            lead.last_name = parts[1] if len(parts) > 1 else ""
+    elif name and not lead.first_name:
+        lead.first_name = name
+
+    if company:
+        if not lead.enriched_data:
+            lead.enriched_data = {}
+        lead.enriched_data["company"] = company
+
+    if email and "@" in email:
+        if lead.email.startswith("chat-"):
+            lead.email = email
+
+    # Check completeness from lead record (not LLM turn)
+    has_name = bool(lead.first_name)
+    has_company = bool((lead.enriched_data or {}).get("company") or lead.title)
+    has_email = bool(lead.email and not lead.email.startswith("chat-"))
 
     # --- Check for requested datetime ---
     requested_dt_str = (turn.get("requested_datetime") or "").strip()
@@ -95,6 +109,16 @@ async def chat_message(body: ChatMessageIn, db: AsyncSession = Depends(get_db)):
     elif classification == "question":
         if current_state == STATE_GREETING:
             reply = reply or "Hello! Who do I have the pleasure of speaking with? What's your name and company?"
+        elif current_state == STATE_COLLECT_INFO:
+            # Answer their question but continue collecting if info is incomplete
+            if has_name and has_company and has_email:
+                await update_session_state(db, session, STATE_INTENT_CONFIRM)
+            else:
+                missing = []
+                if not has_name: missing.append("your name")
+                if not has_company: missing.append("your company")
+                if not has_email: missing.append("your email")
+                reply = (reply or "Sure, happy to answer that!") + f" By the way, I still need {', '.join(missing)} — could you share those?"
         else:
             reply = reply or "Sure — tell me a bit more and I'll help."
 
@@ -104,15 +128,15 @@ async def chat_message(body: ChatMessageIn, db: AsyncSession = Depends(get_db)):
             reply = reply or "Great to meet you! I'm Maya from SocialBoost. To get started, could you share your name, company, and email?"
 
         elif current_state == STATE_COLLECT_INFO:
-            has_name = bool(name or lead.first_name)
-            has_company = bool(company or lead.title)
-            has_email = bool((email and "@" in email) or (lead.email and not lead.email.startswith("chat-")))
-
             if has_name and has_company and has_email:
                 await update_session_state(db, session, STATE_INTENT_CONFIRM)
-                reply = reply or f"Thanks {lead.first_name or name}! What kind of branding help are you looking for?"
+                reply = reply or f"Thanks {lead.first_name}! What kind of branding help are you looking for?"
             else:
-                reply = reply or "Almost there — I still need your name, company, and email to get you set up properly."
+                missing = []
+                if not has_name: missing.append("name")
+                if not has_company: missing.append("company")
+                if not has_email: missing.append("email")
+                reply = reply or f"I still need your {', '.join(missing)} to get you set up. Could you share those?"
 
         elif current_state == STATE_INTENT_CONFIRM:
             if requested_dt_str:
