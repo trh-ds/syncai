@@ -1,0 +1,80 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: asdr
+      POSTGRES_PASSWORD: asdr
+      POSTGRES_DB: asdr_demo
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U asdr -d asdr_demo"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  seed:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ENV: dev
+      DATABASE_URL: postgresql+psycopg://asdr:asdr@postgres:5432/asdr_demo
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GCP_CLIENT_ID: ${GCP_CLIENT_ID:-}
+      GCP_CLIENT_SECRET: ${GCP_CLIENT_SECRET:-}
+      GMAIL_REFRESH_TOKEN: ${GMAIL_REFRESH_TOKEN:-}
+    command: python -m seed.run_seed
+    volumes:
+      - chroma_data:/app/chroma_data
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql+psycopg://asdr:asdr@postgres:5432/asdr_demo
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GROQ_MODEL_TRIAGE: ${GROQ_MODEL_TRIAGE:-llama-3.1-8b-instant}
+      GROQ_MODEL_DRAFT: ${GROQ_MODEL_DRAFT:-llama-3.3-70b-versatile}
+      GROQ_MODEL_DRAFT_FAST_FALLBACK: ${GROQ_MODEL_DRAFT_FAST_FALLBACK:-false}
+      GCP_CLIENT_ID: ${GCP_CLIENT_ID}
+      GCP_CLIENT_SECRET: ${GCP_CLIENT_SECRET}
+      GMAIL_REFRESH_TOKEN: ${GMAIL_REFRESH_TOKEN}
+      GMAIL_MONITORED_EMAIL: ${GMAIL_MONITORED_EMAIL:-}
+      GMAIL_POLL_INTERVAL_MS: ${GMAIL_POLL_INTERVAL_MS:-1500}
+      GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-primary}
+      APOLLO_API_KEY: ${APOLLO_API_KEY:-}
+      APOLLO_SAVED_QUERY_JSON: ${APOLLO_SAVED_QUERY_JSON:-{}}
+      CORS_ORIGINS: http://localhost:3000
+      CHAT_WORKING_HOURS: ${CHAT_WORKING_HOURS:-09:00-18:00}
+      CHAT_TZ: ${CHAT_TZ:-Asia/Kolkata}
+      DEMO_LEAD_ID: ${DEMO_LEAD_ID:-}
+    volumes:
+      - ./backend:/app
+      - chroma_data:/app/chroma_data
+      - /app/.venv
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:
+  chroma_data:

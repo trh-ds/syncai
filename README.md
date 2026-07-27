@@ -21,12 +21,23 @@ Localhost demo of an AI-powered SDR that handles email outreach, lead qualificat
 - Google Cloud project with OAuth 2.0 client (Gmail + Calendar scopes)
 - Apollo API key (optional — uses bundled sample data if absent)
 
-## Setup
+## Quick start (Docker)
+
+```bash
+cp .env.example .env   # fill in secrets
+docker compose up -d   # starts postgres + seed + backend + frontend
+```
+
+Frontend → `http://localhost:3000`, Backend → `http://localhost:8000`
+
+The seed runs automatically on first `up`. The Gmail poller starts inside the backend container.
+
+## Manual setup (no Docker)
 
 ### 1. Environment
 
 ```bash
-cp backend/.env.example backend/.env   # fill in secrets
+cp .env.example backend/.env   # fill in secrets
 cp frontend/.env.local.example frontend/.env.local  # NEXT_PUBLIC_API_BASE=http://localhost:8000
 ```
 
@@ -60,22 +71,15 @@ CREATE DATABASE asdr_demo OWNER asdr;
 make auth-start   # opens http://localhost:8000/auth/start
 ```
 
-Complete the OAuth consent screen. The callback saves the refresh token to `.env`.
-
-## Run
+### 6. Run
 
 ```bash
-# Terminal 1 — Database seed (once)
-make seed              # ENV=dev required
-
-# Terminal 2 — Backend
-make backend-dev       # http://localhost:8000
-
-# Terminal 3 — Gmail poller
-make poller
-
-# Terminal 4 — Frontend
-make frontend-dev      # http://localhost:3000
+# Terminal 1 — Seed
+ENV=dev make seed
+# Terminal 2 — Backend + poller
+make backend-dev
+# Terminal 3 — Frontend
+make frontend-dev
 ```
 
 ## Env vars checklist
